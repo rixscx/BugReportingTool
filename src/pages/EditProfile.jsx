@@ -4,6 +4,7 @@ import { supabase } from '../lib/supabaseClient'
 import { generateAvatarUrl } from '../lib/avatarUtils'
 import { useToast } from '../components/Toast'
 import { useAuth } from '../hooks/useAuth'
+import { AvatarCropper } from '../components/AvatarCropper'
 
 export default function EditProfile() {
   const navigate = useNavigate()
@@ -13,7 +14,9 @@ export default function EditProfile() {
   const [username, setUsername] = useState('')
   const [fullName, setFullName] = useState('')
   const [avatarUrl, setAvatarUrl] = useState('')
-  const [avatarFile, setAvatarFile] = useState(null)
+  const [avatarFile, setAvatarFile] = useState(null)       // Final cropped blob ready for upload
+  const [rawImageFile, setRawImageFile] = useState(null)   // Original file for cropper
+  const [showCropper, setShowCropper] = useState(false)
   const [loading, setLoading] = useState(false)
   const [error, setError] = useState(null)
 
@@ -35,9 +38,10 @@ export default function EditProfile() {
   const handleAvatarUpload = (e) => {
     const file = e.target.files?.[0]
     if (file) {
-      // Validate file type
-      if (!file.type.startsWith('image/')) {
-        setError('Please upload an image file')
+      // Validate file type (only JPG/PNG allowed)
+      const allowedTypes = ['image/jpeg', 'image/png', 'image/jpg']
+      if (!allowedTypes.includes(file.type)) {
+        setError('Please upload a JPG or PNG image')
         return
       }
       
@@ -47,15 +51,45 @@ export default function EditProfile() {
         return
       }
       
-      setAvatarFile(file)
+      // Clear any previous errors
+      setError(null)
       
-      // Preview the uploaded image
-      const reader = new FileReader()
-      reader.onloadend = () => {
-        setAvatarUrl(reader.result)
-      }
-      reader.readAsDataURL(file)
+      // Store raw file and open cropper
+      setRawImageFile(file)
+      setShowCropper(true)
     }
+    
+    // Reset file input so same file can be selected again
+    e.target.value = ''
+  }
+
+  /**
+   * Called when user finishes cropping
+   * @param {Blob} croppedBlob - The cropped image as a PNG blob
+   */
+  const handleCropComplete = (croppedBlob) => {
+    // Convert blob to file for upload
+    const croppedFile = new File([croppedBlob], 'avatar.png', { type: 'image/png' })
+    setAvatarFile(croppedFile)
+    
+    // Preview the cropped image
+    const reader = new FileReader()
+    reader.onloadend = () => {
+      setAvatarUrl(reader.result)
+    }
+    reader.readAsDataURL(croppedBlob)
+    
+    // Close cropper
+    setShowCropper(false)
+    setRawImageFile(null)
+  }
+
+  /**
+   * Called when user cancels cropping
+   */
+  const handleCropCancel = () => {
+    setShowCropper(false)
+    setRawImageFile(null)
   }
 
   const handleRemoveAvatar = () => {
@@ -77,29 +111,38 @@ export default function EditProfile() {
 
       // If user uploaded a new avatar, upload to Supabase Storage
       if (avatarFile) {
-        const fileExt = avatarFile.name.split('.').pop()
-        const fileName = `${session.user.id}-${Date.now()}.${fileExt}`
-        const filePath = `${fileName}`  // Don't use avatars/ prefix, it's in bucket config
+        // Use consistent path: {userId}/avatar.png
+        // This allows easy overwrites and user-specific folders
+        const filePath = `${session.user.id}/avatar.png`
 
-        const { error: uploadError, data: uploadData } = await supabase.storage
+        // Upload with upsert to overwrite existing avatar
+        const { error: uploadError } = await supabase.storage
           .from('avatars')
-          .upload(filePath, avatarFile, { upsert: true })
+          .upload(filePath, avatarFile, { 
+            upsert: true,
+            contentType: 'image/png',
+            cacheControl: '3600'
+          })
 
         if (uploadError) {
           console.error('Upload error:', uploadError)
-          // If bucket doesn't exist, show helpful message
+          // Handle specific error cases
           if (uploadError.message?.includes('not found') || uploadError.message?.includes('does not exist')) {
             throw new Error('Avatar storage not configured. Please create "avatars" bucket in Supabase Storage.')
+          }
+          if (uploadError.message?.includes('policy') || uploadError.message?.includes('permission')) {
+            throw new Error('Upload not allowed. Storage policy may need updating.')
           }
           throw new Error(`Failed to upload avatar: ${uploadError.message}`)
         }
 
-        // Get public URL
+        // Get public URL with cache-busting timestamp
         const { data } = supabase.storage
           .from('avatars')
           .getPublicUrl(filePath)
 
-        finalAvatarUrl = data.publicUrl
+        // Add timestamp to bust browser cache
+        finalAvatarUrl = `${data.publicUrl}?t=${Date.now()}`
       }
 
       // Prepare update data (don't include id or email - they're immutable)
@@ -178,6 +221,15 @@ export default function EditProfile() {
 
   return (
     <div className="min-h-screen bg-slate-50 py-12 px-4">
+      {/* Avatar Cropper Modal */}
+      {showCropper && rawImageFile && (
+        <AvatarCropper
+          imageFile={rawImageFile}
+          onCropComplete={handleCropComplete}
+          onCancel={handleCropCancel}
+        />
+      )}
+      
       <div className="max-w-2xl mx-auto">
         {/* Header */}
         <div className="mb-8">
@@ -250,17 +302,17 @@ export default function EditProfile() {
                 <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                   <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M4 16l4.586-4.586a2 2 0 012.828 0L16 16m-2-2l1.586-1.586a2 2 0 012.828 0L20 14m-6-6h.01M6 20h12a2 2 0 002-2V6a2 2 0 00-2-2H6a2 2 0 00-2 2v12a2 2 0 002 2z" />
                 </svg>
-                Upload Custom Avatar
+                {avatarFile ? 'Change Avatar' : 'Upload Custom Avatar'}
                 <input
                   type="file"
-                  accept="image/*"
+                  accept="image/jpeg,image/png,image/jpg"
                   onChange={handleAvatarUpload}
                   className="hidden"
                 />
               </label>
               
               <p className="text-xs text-slate-500 text-center">
-                JPG, PNG or GIF (max 2MB)
+                JPG or PNG only (max 2MB)
               </p>
             </div>
           </div>
