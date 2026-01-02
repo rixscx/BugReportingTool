@@ -25,10 +25,12 @@
 - ⌨️ **Shortcuts** - Ctrl+K quick actions, extensive keyboard navigation
 - 📸 **File Management** - Drag-and-drop uploads, image preview
 - 🔑 **OAuth** - Google sign-in support with automatic profile creation
+- �️ **Avatar System** - Procedural geometric avatars + custom uploads (max 2MB)
+- 👤 **Profile Management** - Edit username, full name, and avatar
+- 🗑️ **Account Deletion** - Production-grade secure account removal
 - 🔐 **Security** - RLS policies, session management, HTTPS-ready
 - 📱 **Responsive** - Mobile-first, touch-friendly, PWA-ready
 - 💾 **Real-time Sync** - Live updates with offline support
-- 🗑️ **Account Management** - Users can delete their profiles
 
 ## 🛠️ Tech Stack
 
@@ -210,14 +212,42 @@ All data is stored in the `profiles` table in Supabase.
 - Sign out
 - **Delete Account** (not available for test accounts)
 
+### Avatar System
+
+**Procedural Generation:**
+- Unique geometric pattern avatars generated from your user ID
+- Deterministic (same ID = same avatar)
+- No external API dependencies
+- Instant generation
+
+**Custom Upload:**
+- Upload your own avatar (JPG, PNG, GIF, WebP)
+- Maximum file size: 2MB
+- Automatic image optimization
+- Stored securely in Supabase Storage
+
+**Avatar Actions:**
+- Click to upload new image
+- Remove uploaded avatar (reverts to generated pattern)
+- Instant preview before saving
+
 ### Delete Account
 
-When you delete your account:
-- ✅ Profile data is permanently removed
-- ✅ All associated bugs remain in system (for audit trail)
-- ✅ Action cannot be undone
-- ✅ Requires confirmation dialog
-- ❌ Not available for test accounts (prevents accidental deletion)
+**Production-Grade Security:**
+When you delete your account, the system performs a transaction-safe cleanup:
+- ✅ All your bugs are deleted (CASCADE)
+- ✅ All your comments are removed (CASCADE)
+- ✅ Avatar files deleted from storage
+- ✅ Profile data permanently removed
+- ✅ Authentication credentials erased
+- ✅ Cannot log back in after deletion
+- ✅ Requires confirmation dialog with detailed warning
+
+**Important:**
+- ❌ Action cannot be undone
+- ❌ Test accounts cannot be deleted (protects demo data)
+- ✅ Transaction-safe (all-or-nothing)
+- ✅ RLS policies enforce proper authorization
 
 **Note:** Test accounts (`test.user@gmail.com`, `test.admin@gmail.com`) cannot be deleted to protect demo data.
 

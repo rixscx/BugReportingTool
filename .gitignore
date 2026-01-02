@@ -48,3 +48,12 @@ deploy-docker.sh
 # Misc files
 *.pdf
 !README.pdf
+
+# SQL migration scripts (keep in repo for reference)
+# These should be run manually in Supabase
+*.sql
+
+# Temporary files
+*.tmp
+*.temp
+~*

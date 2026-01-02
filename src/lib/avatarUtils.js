@@ -1,24 +1,33 @@
+import { generateAvatarDataURL } from './avatarGenerator.jsx'
+
 /**
  * Generate a unique avatar URL for a user
- * Uses DiceBear API - generates unique avatars based on seed
- * Similar to GitHub's avatars
+ * Uses procedural generation - same user ID always gets same avatar
+ * Avatars are geometric patterns, not initials
  */
 export const generateAvatarUrl = (seed) => {
   if (!seed) return null
-  // DiceBear API with multiple styles, returns unique avatar per seed
-  return `https://api.dicebear.com/7.x/avataaars/svg?seed=${encodeURIComponent(seed)}&scale=80`
+  return generateAvatarDataURL(seed, 90)
 }
 
 /**
- * Alternative styles available:
- * - avataaars (recommended - colorful, detailed)
- * - pixel-art (retro 8-bit style)
- * - identicon (geometric patterns)
- * - initials (user initials)
- * - bottts (robot style)
- * - personas (illustrated style)
- * 
- * Example:
- * https://api.dicebear.com/7.x/avataaars/svg?seed=john@example.com
- * https://api.dicebear.com/7.x/pixel-art/svg?seed=john@example.com
+ * Get avatar styles available
  */
+export const AVATAR_STYLES = [
+  { value: 'geometric', label: 'Geometric (Default)' },
+  { value: 'blocks', label: 'Block Pattern' },
+  { value: 'dots', label: 'Dot Matrix' },
+  { value: 'waves', label: 'Wave Pattern' },
+]
+
+/**
+ * Generate avatar with custom style
+ * Currently all use same algorithm, but seed is modified for variety
+ */
+export const generateAvatarWithStyle = (seed, style = 'geometric') => {
+  if (!seed) return null
+  
+  // Add style prefix to seed to generate different patterns
+  const styledSeed = `${style}-${seed}`
+  return generateAvatarDataURL(styledSeed, 90)
+}

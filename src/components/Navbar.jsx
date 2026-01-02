@@ -3,9 +3,8 @@ import { Link, useLocation, useNavigate } from 'react-router-dom'
 import { supabase } from '../lib/supabaseClient'
 import { useAuth } from '../hooks/useAuth'
 import { useToast } from './Toast'
-import { useConfirmDialog } from './ConfirmDialog'
+import { ConfirmDialog, useConfirmDialog } from './ConfirmDialog'
 import { KeyboardShortcutsHelp } from './KeyboardShortcutsHelp'
-import { NotificationCenter } from './NotificationCenter'
 
 export default function Navbar({ session, userProfile, isAdmin }) {
   const location = useLocation()
@@ -45,9 +44,25 @@ export default function Navbar({ session, userProfile, isAdmin }) {
 
   const handleDeleteAccount = useCallback(async () => {
     const confirmed = await deleteDialog.confirm({
-      title: 'Delete Account',
-      description: 'This action cannot be undone. All your profile data will be permanently deleted. You will not be able to recover your account.',
-      confirmText: 'Delete My Account',
+      title: '⚠️ Permanently Delete Account?',
+      description: (
+        <div className="space-y-3 text-left">
+          <p className="font-semibold text-red-600">This action CANNOT be undone!</p>
+          <p className="text-sm">Deleting your account will permanently remove:</p>
+          <ul className="text-sm list-disc list-inside space-y-1 text-slate-600">
+            <li>Your profile and authentication</li>
+            <li>All bugs you've created</li>
+            <li>All comments you've posted</li>
+            <li>Your uploaded avatar and files</li>
+            <li>All associated data</li>
+          </ul>
+          <p className="text-sm font-medium text-slate-700 mt-4">
+            Are you absolutely sure you want to delete your account?
+          </p>
+        </div>
+      ),
+      confirmText: 'Yes, Delete Everything',
+      cancelText: 'Cancel',
       variant: 'danger',
     })
     
@@ -55,14 +70,21 @@ export default function Navbar({ session, userProfile, isAdmin }) {
 
     try {
       setShowUserMenu(false)
+      showToast('Deleting account...', 'info')
+      
       await deleteAccount()
+      
+      // Success message (will show briefly before redirect)
       showToast('Account deleted successfully', 'success')
-      navigate('/')
+      
     } catch (err) {
-      showToast('Failed to delete account. Please try again.', 'error')
-      console.error('Error deleting account:', err)
+      console.error('Delete account error:', err)
+      showToast(
+        err.message || 'Failed to delete account. Please try again or contact support.',
+        'error'
+      )
     }
-  }, [deleteDialog, deleteAccount, showToast, navigate])
+  }, [deleteDialog, deleteAccount, showToast])
 
   useEffect(() => {
     const handleKeyDown = (e) => {
@@ -131,9 +153,6 @@ export default function Navbar({ session, userProfile, isAdmin }) {
                 <kbd className="text-xs bg-white px-1.5 py-0.5 rounded border border-slate-200 text-slate-400 font-semibold">⌘K</kbd>
               </button>
 
-              {/* Notifications */}
-              <NotificationCenter userId={session?.user?.id} />
-
               {/* Help */}
               <button
                 onClick={() => setShowShortcutsHelp(true)}
@@ -201,6 +220,19 @@ export default function Navbar({ session, userProfile, isAdmin }) {
                         </p>
                       </div>
                     </div>
+                    
+                    <button
+                      onClick={() => {
+                        navigate('/edit-profile')
+                        setShowUserMenu(false)
+                      }}
+                      className="w-full px-4 py-2.5 text-left text-sm text-slate-700 hover:bg-slate-50 flex items-center gap-2.5 transition-colors"
+                    >
+                      <svg className="w-4 h-4 text-slate-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M11 5H6a2 2 0 00-2 2v11a2 2 0 002 2h11a2 2 0 002-2v-5m-1.414-9.414a2 2 0 112.828 2.828L11.828 15H9v-2.828l8.586-8.586z" />
+                      </svg>
+                      Edit Profile
+                    </button>
                     
                     <button
                       onClick={() => {
@@ -282,6 +314,8 @@ export default function Navbar({ session, userProfile, isAdmin }) {
         isOpen={showShortcutsHelp} 
         onClose={() => setShowShortcutsHelp(false)} 
       />
+      
+      <ConfirmDialog {...deleteDialog.dialogProps} />
     </>
   )
 }

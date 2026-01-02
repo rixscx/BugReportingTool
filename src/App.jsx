@@ -14,6 +14,7 @@ import Navbar from './components/Navbar'
 const Dashboard = lazy(() => import('./pages/Dashboard'))
 const CreateBug = lazy(() => import('./pages/CreateBug'))
 const BugDetail = lazy(() => import('./pages/BugDetail'))
+const EditProfile = lazy(() => import('./pages/EditProfile'))
 
 if (typeof window !== 'undefined') {
   initWatermark()
@@ -34,6 +35,7 @@ function AuthenticatedApp({ session, userProfile, isAdmin }) {
           <Routes>
             <Route path="/" element={<Dashboard />} />
             <Route path="/create" element={<CreateBug session={session} />} />
+            <Route path="/edit-profile" element={<EditProfile />} />
             <Route
               path="/bug/:id"
               element={<BugDetail session={session} isAdmin={isAdmin} />}
