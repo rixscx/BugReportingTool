@@ -12,8 +12,6 @@ import Dashboard from './pages/Dashboard'
 import CreateBug from './pages/CreateBug'
 import BugDetail from './pages/BugDetail'
 
-const basename = import.meta.env.BASE_URL || '/'
-
 if (typeof window !== 'undefined') {
   initWatermark()
 }
@@ -72,7 +70,7 @@ function AppContent() {
 
 function App() {
   return (
-    <BrowserRouter basename={basename}>
+    <BrowserRouter>
       <ToastProvider>
         <AppContent />
       </ToastProvider>
@@ -81,4 +79,3 @@ function App() {
 }
 
 export default App
-
