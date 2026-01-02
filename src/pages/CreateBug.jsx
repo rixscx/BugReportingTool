@@ -3,6 +3,7 @@ import { useNavigate } from 'react-router-dom'
 import { supabase } from '../lib/supabaseClient'
 import { useKeyboardShortcut } from '../hooks/useKeyboardShortcut'
 import { useBugs } from '../hooks/useBugs'
+import { useAuth } from '../hooks/useAuth'
 import { SHORTCUT_KEYS } from '../lib/constants'
 import { useToast } from '../components/Toast'
 import { DuplicateDetector, LabelSelector } from '../components/BugHelpers'
@@ -10,6 +11,7 @@ import { DuplicateDetector, LabelSelector } from '../components/BugHelpers'
 export default function CreateBug({ session }) {
   const navigate = useNavigate()
   const { showToast } = useToast()
+  const { userProfile } = useAuth()
   const { bugs: existingBugs } = useBugs({ includeArchived: false })
   const titleInputRef = useRef(null)
   const [loading, setLoading] = useState(false)
@@ -135,13 +137,48 @@ export default function CreateBug({ session }) {
     if (e.dataTransfer.files?.[0]) processFile(e.dataTransfer.files[0])
   }
 
+  /**
+   * Upload bug screenshot to "Bug images" bucket
+   * Path: {sanitized_bug_title}-{reported_by}.png
+   * Where reported_by = full_name || username || 'unknown'
+   */
   const uploadImage = async () => {
     if (!imageFile) return null
-    const fileExt = imageFile.name.split('.').pop()
-    const fileName = `${Date.now()}-${Math.random().toString(36).substring(7)}.${fileExt}`
-    const { error: uploadError } = await supabase.storage.from('Bug images').upload(fileName, imageFile)
+    
+    // Get reporter name from profile: full_name > username > email prefix
+    const reportedBy = userProfile?.full_name || 
+                       userProfile?.username || 
+                       session?.user?.email?.split('@')[0] || 
+                       'unknown'
+    
+    // Sanitize bug title for filename (remove special chars, limit length)
+    const sanitizedTitle = formData.title
+      .toLowerCase()
+      .replace(/[^a-z0-9]+/g, '-')
+      .replace(/^-+|-+$/g, '')
+      .substring(0, 50)
+    
+    // Sanitize reporter name
+    const sanitizedReporter = reportedBy
+      .toLowerCase()
+      .replace(/[^a-z0-9]+/g, '-')
+      .replace(/^-+|-+$/g, '')
+    
+    // Build filename: {bug_title}-{reported_by}.png
+    const fileName = `${sanitizedTitle}-${sanitizedReporter}.png`
+    
+    // Upload to "Bug images" bucket ONLY
+    const { error: uploadError } = await supabase.storage
+      .from('Bug images')
+      .upload(fileName, imageFile, { upsert: true })
+    
     if (uploadError) throw uploadError
-    const { data } = supabase.storage.from('Bug images').getPublicUrl(fileName)
+    
+    // Get public URL from "Bug images" bucket
+    const { data } = supabase.storage
+      .from('Bug images')
+      .getPublicUrl(fileName)
+    
     return data.publicUrl
   }
 

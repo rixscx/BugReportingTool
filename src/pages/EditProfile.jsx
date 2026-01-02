@@ -111,11 +111,18 @@ export default function EditProfile() {
 
       // If user uploaded a new avatar, upload to Supabase Storage
       if (avatarFile) {
-        // Path: {userId}/avatar.png inside 'avatars' bucket
-        const filePath = `${session.user.id}/avatar.png`
+        // Get display name for filename: full_name > username > 'avatar'
+        const displayName = (fullName || username || 'avatar')
+          .toLowerCase()
+          .replace(/[^a-z0-9]+/g, '-')
+          .replace(/^-+|-+$/g, '')
+          .substring(0, 50)
+        
+        // Path: {userId}/{display_name}.png inside 'avatars' bucket ONLY
+        const filePath = `${session.user.id}/${displayName}.png`
 
-        // Upload cropped image to Supabase Storage
-        const { error: uploadError, data: uploadData } = await supabase.storage
+        // Upload cropped avatar to 'avatars' bucket ONLY (never to Bug images)
+        const { error: uploadError } = await supabase.storage
           .from('avatars')
           .upload(filePath, avatarFile, { 
             upsert: true,
