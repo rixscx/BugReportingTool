@@ -34,6 +34,29 @@
 - **Backend**: Supabase (PostgreSQL, RLS, Auth)
 - **Tools**: ESLint, Docker, Nginx
 
+## 🧪 Testing the Application
+
+### Test Accounts
+
+For quick testing without creating real accounts, use these test profiles:
+
+| Email | Password | Role | Status |
+|-------|----------|------|--------|
+| `test.user@gmail.com` | `Test@123` | User | Pre-verified |
+| `test.admin@gmail.com` | `Admin@123` | Admin | Pre-verified |
+
+**Note:** These test accounts are pre-verified and ready to use. Email verification is already completed.
+
+### Test Features
+
+1. **Sign In** - Use test credentials above
+2. **Create Bugs** - Report test issues
+3. **Assign** - Assign bugs to yourself or other users
+4. **Comments** - Add comments to bugs
+5. **Status** - Change bug status (Admin only feature)
+6. **Sign Out** - Test logout functionality
+7. **Google OAuth** - Test "Sign in with Google" button
+
 ## 🚀 Quick Start
 
 ### Prerequisites
