@@ -111,38 +111,31 @@ export default function EditProfile() {
 
       // If user uploaded a new avatar, upload to Supabase Storage
       if (avatarFile) {
-        // Use consistent path: {userId}/avatar.png
-        // This allows easy overwrites and user-specific folders
+        // Path: {userId}/avatar.png inside 'avatars' bucket
         const filePath = `${session.user.id}/avatar.png`
 
-        // Upload with upsert to overwrite existing avatar
-        const { error: uploadError } = await supabase.storage
+        // Upload cropped image to Supabase Storage
+        const { error: uploadError, data: uploadData } = await supabase.storage
           .from('avatars')
           .upload(filePath, avatarFile, { 
             upsert: true,
-            contentType: 'image/png',
-            cacheControl: '3600'
+            contentType: 'image/png'
           })
 
         if (uploadError) {
-          console.error('Upload error:', uploadError)
-          // Handle specific error cases
-          if (uploadError.message?.includes('not found') || uploadError.message?.includes('does not exist')) {
-            throw new Error('Avatar storage not configured. Please create "avatars" bucket in Supabase Storage.')
-          }
-          if (uploadError.message?.includes('policy') || uploadError.message?.includes('permission')) {
-            throw new Error('Upload not allowed. Storage policy may need updating.')
-          }
-          throw new Error(`Failed to upload avatar: ${uploadError.message}`)
+          console.error('Avatar upload failed:', uploadError)
+          showToast('Failed to upload avatar. Please try again.', 'error')
+          setLoading(false)
+          return
         }
 
-        // Get public URL with cache-busting timestamp
-        const { data } = supabase.storage
+        // Generate public URL
+        const { data: urlData } = supabase.storage
           .from('avatars')
           .getPublicUrl(filePath)
 
-        // Add timestamp to bust browser cache
-        finalAvatarUrl = `${data.publicUrl}?t=${Date.now()}`
+        // Cache-bust to show new avatar immediately
+        finalAvatarUrl = `${urlData.publicUrl}?t=${Date.now()}`
       }
 
       // Prepare update data (don't include id or email - they're immutable)
