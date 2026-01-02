@@ -1,0 +1,48 @@
+version: '3.8'
+
+services:
+  bug-reporting-tool:
+    build:
+      context: .
+      dockerfile: Dockerfile
+    container_name: bug-reporting-tool
+    ports:
+      - "${PORT:-3000}:3000"
+    environment:
+      - NODE_ENV=production
+      - VITE_SUPABASE_URL=${VITE_SUPABASE_URL}
+      - VITE_SUPABASE_ANON_KEY=${VITE_SUPABASE_ANON_KEY}
+      - VITE_BASE_PATH=${VITE_BASE_PATH:-/}
+    restart: unless-stopped
+    healthcheck:
+      test: ["CMD", "wget", "--quiet", "--tries=1", "--spider", "http://localhost:3000/"]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+      start_period: 40s
+    volumes:
+      # Optional: for development/debugging
+      # - ./src:/app/src
+      # - ./public:/app/public
+    networks:
+      - bug-tracker-network
+
+  # Optional: nginx reverse proxy for production
+  nginx:
+    image: nginx:alpine
+    container_name: bug-reporting-tool-nginx
+    ports:
+      - "80:80"
+      - "443:443"
+    volumes:
+      - ./nginx.conf:/etc/nginx/nginx.conf:ro
+      - ./ssl:/etc/nginx/ssl:ro
+    depends_on:
+      - bug-reporting-tool
+    restart: unless-stopped
+    networks:
+      - bug-tracker-network
+
+networks:
+  bug-tracker-network:
+    driver: bridge

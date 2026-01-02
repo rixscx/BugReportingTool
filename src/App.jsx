@@ -1,4 +1,5 @@
 import { BrowserRouter, Routes, Route, Navigate } from 'react-router-dom'
+import { lazy, Suspense } from 'react'
 import { useAuth } from './hooks/useAuth'
 import { useBugs } from './hooks/useBugs'
 import { ToastProvider } from './components/Toast'
@@ -8,11 +9,11 @@ import { QuickActions } from './components/QuickActions'
 import { initWatermark } from './lib/watermark'
 import Auth from './components/Auth'
 import Navbar from './components/Navbar'
-import Dashboard from './pages/Dashboard'
-import CreateBug from './pages/CreateBug'
-import BugDetail from './pages/BugDetail'
 
-const basename = import.meta.env.BASE_URL || '/'
+// Lazy load pages for code splitting
+const Dashboard = lazy(() => import('./pages/Dashboard'))
+const CreateBug = lazy(() => import('./pages/CreateBug'))
+const BugDetail = lazy(() => import('./pages/BugDetail'))
 
 if (typeof window !== 'undefined') {
   initWatermark()
@@ -29,15 +30,17 @@ function AuthenticatedApp({ session, userProfile, isAdmin }) {
         isAdmin={isAdmin} 
       />
       <main className="min-h-[calc(100vh-56px)]">
-        <Routes>
-          <Route path="/" element={<Dashboard />} />
-          <Route path="/create" element={<CreateBug session={session} />} />
-          <Route
-            path="/bug/:id"
-            element={<BugDetail session={session} isAdmin={isAdmin} />}
-          />
-          <Route path="*" element={<Navigate to="/" replace />} />
-        </Routes>
+        <Suspense fallback={<PageLoader />}>
+          <Routes>
+            <Route path="/" element={<Dashboard />} />
+            <Route path="/create" element={<CreateBug session={session} />} />
+            <Route
+              path="/bug/:id"
+              element={<BugDetail session={session} isAdmin={isAdmin} />}
+            />
+            <Route path="*" element={<Navigate to="/" replace />} />
+          </Routes>
+        </Suspense>
       </main>
       <KeyboardShortcutsHelp />
       <QuickActions bugs={bugs} />
@@ -72,7 +75,7 @@ function AppContent() {
 
 function App() {
   return (
-    <BrowserRouter basename={basename}>
+    <BrowserRouter basename={import.meta.env.BASE_URL}>
       <ToastProvider>
         <AppContent />
       </ToastProvider>

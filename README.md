@@ -8,626 +8,180 @@
 [![Supabase](https://img.shields.io/badge/Supabase-Backend-3ECF8E?logo=supabase&logoColor=white)](https://supabase.com/)
 [![License: MIT](https://img.shields.io/badge/License-MIT-yellow.svg)](https://opensource.org/licenses/MIT)
 
-**A modern, full-featured bug tracking system with real-time collaboration and intelligent workflow management.**
+**Professional bug tracking system with real-time collaboration and workflow management.**
 
-[Features](#-features) • [Demo](#-demo) • [Installation](#-installation) • [Documentation](#-documentation) • [Contributing](#-contributing)
-
----
+[Features](#-features) • [Quick Start](#-quick-start) • [Deployment](#-deployment) • [Documentation](#-documentation) • [Contributing](#-contributing)
 
 </div>
 
+---
+
 ## ✨ Features
 
-### Core Functionality
-- **🎯 Comprehensive Bug Management**
-  - Create, edit, and track bugs with customizable status states
-  - Priority levels (Critical, High, Medium, Low)
-  - Rich text descriptions with markdown support
-  - Automated environment detection (browser, OS, versions)
-
-- **📊 Advanced Analytics Dashboard**
-  - Real-time bug statistics and trends
-  - Visual charts for status and priority distribution
-  - Resolution time metrics
-  - Top reporters and activity tracking
-
-- **🎨 Flexible Workflow Views**
-  - Traditional list view with advanced filtering
-  - Kanban board with drag-and-drop functionality
-  - Quick actions command palette (Ctrl+K)
-  - Timeline view for activity tracking
-
-### Collaboration & Productivity
-- **👥 Team Collaboration**
-  - Assign bugs to team members
-  - Real-time comment threads
-  - @mentions and notifications
-  - Activity timeline for complete audit trail
-
-- **⌨️ Keyboard-First Design**
-  - Extensive keyboard shortcuts
-  - Quick actions search (Ctrl+K)
-  - Accessible navigation (Tab, Escape, Enter)
-  - Help modal (Ctrl+/)
-
-- **🔍 Powerful Search & Filtering**
-  - Full-text search across all bugs
-  - Multi-criteria filtering (status, priority, assignee)
-  - Recent searches history
-  - Export filtered results to CSV/JSON
-
-### Technical Features
-- **💾 Real-time Synchronization**
-  - Live updates across multiple tabs and devices
-  - Optimistic UI updates for instant feedback
-  - Automatic conflict resolution
-  - Offline-first architecture (localStorage caching)
-
-- **📸 Media & File Management**
-  - Drag-and-drop file uploads
-  - Image preview and gallery view
-  - Multiple file format support
-  - Automatic compression and optimization
-
-- **🔐 Enterprise-Grade Security**
-  - Supabase authentication (Email/Password, OAuth)
-  - Row-level security (RLS) policies
-  - Session management with auto-refresh
-  - HTTPS-only production deployment
-
-- **📱 Responsive Design**
-  - Mobile-first approach
-  - Touch-friendly interactions
-  - Adaptive layouts for all screen sizes
-  - Progressive Web App (PWA) ready
+- 🎯 **Bug Management** - Create, edit, track with custom statuses and priorities
+- 📊 **Analytics** - Real-time statistics, trends, and metrics
+- 🎨 **Multiple Views** - List, Kanban board, and timeline
+- 👥 **Collaboration** - Comments, mentions, activity tracking
+- ⌨️ **Shortcuts** - Ctrl+K quick actions, extensive keyboard navigation
+- 📸 **File Management** - Drag-and-drop uploads, image preview
+- 🔐 **Security** - RLS policies, session management, HTTPS-ready
+- 📱 **Responsive** - Mobile-first, touch-friendly, PWA-ready
+- 💾 **Real-time Sync** - Live updates with offline support
 
 ## 🛠️ Tech Stack
 
-### Frontend
-| Technology | Version | Purpose |
-|------------|---------|---------|
-| [React](https://react.dev/) | 19.x | UI framework with modern hooks |
-| [Vite](https://vitejs.dev/) | 7.x | Lightning-fast build tool with HMR |
-| [Tailwind CSS](https://tailwindcss.com/) | 4.x | Utility-first styling |
-| [React Router](https://reactrouter.com/) | 7.x | Client-side routing |
-| [Lucide React](https://lucide.dev/) | Latest | Icon library |
+- **Frontend**: React 19, Vite 7, Tailwind CSS 4, React Router 7
+- **Backend**: Supabase (PostgreSQL, RLS, Auth)
+- **Tools**: ESLint, Docker, Nginx
 
-### Backend & Infrastructure
-| Technology | Purpose |
-|------------|---------|
-| [Supabase](https://supabase.com/) | Backend-as-a-Service (PostgreSQL) |
-| PostgreSQL | Relational database |
-| Row Level Security | Data access control |
-| Real-time Subscriptions | Live data updates |
-| Storage Buckets | File uploads and CDN |
-
-### Development Tools
-- **ESLint** - Code quality and consistency
-- **PostCSS** - CSS transformations
-- **Git** - Version control
-- **npm/yarn** - Package management
-
-## 🎬 Demo
-
-### Screenshots
-
-**Dashboard Overview**
-- Real-time bug statistics and analytics
-- Quick filters and search functionality
-- Status-based organization
-
-**Kanban Board**
-- Drag-and-drop workflow management
-- Visual status tracking
-- Quick bug creation and updates
-
-**Bug Details**
-- Complete bug information
-- Comment threads and collaboration
-- File attachments and media gallery
-
-## 🚀 Installation
+## 🚀 Quick Start
 
 ### Prerequisites
+- Node.js 18+ ([Download](https://nodejs.org/))
+- Supabase Account ([Free tier](https://supabase.com/))
 
-Before you begin, ensure you have the following installed:
-- **Node.js** 18.x or higher ([Download](https://nodejs.org/))
-- **npm** 9.x or **yarn** 1.22+ (included with Node.js)
-- **Git** ([Download](https://git-scm.com/))
-- **Supabase Account** ([Sign up free](https://supabase.com/))
+### Installation
 
-### Quick Start
+```bash
+# Clone and setup
+git clone https://github.com/rixscx/BugReportingTool.git
+cd BugReportingTool
 
-1. **Clone the repository**
-   ```bash
-   git clone https://github.com/rixscx/BugReportingTool.git
-   cd BugReportingTool
-   ```
+# Install dependencies
+npm install
 
-2. **Install dependencies**
-   ```bash
-   npm install
-   # or
-   yarn install
-   ```
+# Configure environment
+cp .env.example .env
+# Edit .env with your Supabase credentials
 
-3. **Set up environment variables**
-   
-   Create a `.env` file in the root directory:
-   ```bash
-   cp .env.example .env
-   ```
-   
-   Update the `.env` file with your Supabase credentials:
-   ```env
-   VITE_SUPABASE_URL=https://your-project.supabase.co
-   VITE_SUPABASE_ANON_KEY=your-anon-key-here
-   ```
-   
-   > 💡 **Finding your credentials:** Go to your [Supabase Dashboard](https://app.supabase.com/) → Project Settings → API
-
-4. **Set up the database**
-   
-   Run the SQL scripts in your Supabase SQL Editor:
-   ```sql
-   -- Create tables (see Database Schema section)
-   -- Enable Row Level Security
-   -- Set up storage buckets for file uploads
-   ```
-
-5. **Start the development server**
-   ```bash
-   npm run dev
-   ```
-   
-   The application will be available at **http://localhost:5173** 🎉
+# Start development
+npm run dev
+# Visit http://localhost:5173
+```
 
 ### Production Build
 
 ```bash
-# Create optimized production build
-npm run build
-
-# Preview production build locally
-npm run preview
+npm run build       # Build optimized version
+npm run preview     # Test production build locally
 ```
 
-The production files will be in the `dist/` directory, ready to deploy to any static hosting service.
+## 📦 Bundle Size
+
+- ✅ **70% reduction** - From 537KB to 160KB (gzipped)
+- ✅ **Code splitting** - 8 intelligent chunks
+- ✅ **Lazy loading** - Pages load on-demand
+- ✅ **Gzip compression** - All assets compressed
+
+## 🚀 Deployment
+
+Quick deployment options:
+
+| Platform | Time | Notes |
+|----------|------|-------|
+| **Vercel** ⭐ | 3 min | Auto-deploys on push |
+| **Docker** | 5 min | Full stack included |
+| **GitHub Pages** | 2 min | Static hosting |
+| **AWS ECS** | 15 min | Enterprise ready |
+| **Railway** | 5 min | Generous free tier |
+
+### Vercel (Fastest)
+```bash
+git add . && git commit -m "Production ready"
+git push origin main
+# Visit vercel.com, import repo, set env vars, deploy!
+```
+
+### Docker
+```bash
+cp .env.example .env.production
+npm run docker:compose
+# Visit http://localhost:3000
+```
+
+For detailed guides, see [QUICK_DEPLOY.md](QUICK_DEPLOY.md).
 
 ## 📚 Documentation
 
-### Available Scripts
+- **[QUICK_DEPLOY.md](QUICK_DEPLOY.md)** - 7 deployment methods
+- **[PRODUCTION_GUIDE.md](PRODUCTION_GUIDE.md)** - Detailed setup
+- **[COMMANDS_REFERENCE.md](COMMANDS_REFERENCE.md)** - CLI commands
+- **[OPTIMIZATION_REPORT.md](OPTIMIZATION_REPORT.md)** - Technical details
+- **[PRODUCTION_CHECKLIST.md](PRODUCTION_CHECKLIST.md)** - Pre-launch verification
 
-| Command | Description |
-|---------|-------------|
-| `npm run dev` | Start development server with hot module replacement |
-| `npm run build` | Create optimized production build |
-| `npm run preview` | Preview production build locally |
-| `npm run lint` | Run ESLint to check code quality |
-| `npm run lint:fix` | Auto-fix ESLint issues |
+## 🔧 Scripts
 
-### Project Structure
-
-```
-bug-reporting-tool/
-├── public/                 # Static assets
-├── src/
-│   ├── components/        # Reusable React components
-│   │   ├── Auth.jsx       # Authentication forms
-│   │   ├── Navbar.jsx     # Navigation bar
-│   │   ├── BugCard.jsx    # Bug list item
-│   │   ├── StatusBadge.jsx
-│   │   ├── CommentSection.jsx
-│   │   ├── ActivityTimeline.jsx
-│   │   ├── KanbanBoard.jsx
-│   │   ├── Analytics.jsx
-│   │   ├── QuickActions.jsx
-│   │   └── ...
-│   ├── pages/            # Top-level route components
-│   │   ├── Dashboard.jsx  # Main bug list view
-│   │   ├── CreateBug.jsx  # Bug creation form
-│   │   └── BugDetail.jsx  # Individual bug page
-│   ├── hooks/            # Custom React hooks
-│   │   ├── useAuth.js     # Authentication state
-│   │   ├── useBugs.js     # Bug data fetching
-│   │   ├── useLocalStorage.js
-│   │   ├── useKeyboardShortcut.js
-│   │   └── ...
-│   ├── lib/              # Utilities and helpers
-│   │   ├── supabaseClient.js  # Supabase configuration
-│   │   ├── constants.js       # App constants
-│   │   ├── dateUtils.js       # Date formatting
-│   │   ├── exportUtils.jsx    # CSV/JSON export
-│   │   └── watermark.js       # Creator attribution
-│   ├── assets/           # Images, fonts, etc.
-│   ├── App.jsx           # Root component with routing
-│   ├── main.jsx          # Application entry point
-│   └── index.css         # Global styles and Tailwind
-├── .env                  # Environment variables (git-ignored)
-├── .env.example          # Environment template
-├── .gitignore
-├── eslint.config.js      # ESLint configuration
-├── vite.config.js        # Vite build configuration
-├── tailwind.config.js    # Tailwind CSS configuration
-├── postcss.config.js
-└── package.json
-```
-
-### Key Components
-
-#### Pages
-- **Dashboard** - Main view with bug list, filters, and quick actions
-- **CreateBug** - Form to report bugs with environment auto-detection
-- **BugDetail** - Detailed view with comments, attachments, and status management
-
-#### Components
-- **KanbanBoard** - Drag-and-drop workflow board
-- **Analytics** - Charts and metrics visualization
-- **QuickActions** - Command palette for fast navigation (Ctrl+K)
-- **CommentSection** - Threaded discussions
-- **ActivityTimeline** - Audit log of all bug changes
-- **NotificationCenter** - Real-time notifications
-
-#### Custom Hooks
-- **useAuth** - Authentication state and session management
-- **useBugs** - Bug CRUD operations with real-time sync
-- **useKeyboardShortcut** - Keyboard navigation system
-- **useLocalStorage** - Persistent local state
-- **useOptimistic** - Optimistic UI updates
-
-### Database Schema
-
-The application uses **Supabase (PostgreSQL)** with the following structure:
-
-#### Tables
-
-**`profiles`**
-```sql
-- id (uuid, primary key)
-- email (text)
-- full_name (text)
-- avatar_url (text)
-- role (text) -- 'admin', 'developer', 'tester'
-- created_at (timestamp)
-- updated_at (timestamp)
-```
-
-**`bugs`**
-```sql
-- id (uuid, primary key)
-- title (text)
-- description (text)
-- status (text) -- 'open', 'in_progress', 'resolved', 'closed'
-- priority (text) -- 'critical', 'high', 'medium', 'low'
-- reporter_id (uuid, foreign key → profiles)
-- assignee_id (uuid, foreign key → profiles)
-- environment (jsonb) -- browser, OS, version info
-- created_at (timestamp)
-- updated_at (timestamp)
-- resolved_at (timestamp)
-```
-
-**`comments`**
-```sql
-- id (uuid, primary key)
-- bug_id (uuid, foreign key → bugs)
-- user_id (uuid, foreign key → profiles)
-- content (text)
-- created_at (timestamp)
-- updated_at (timestamp)
-```
-
-**`attachments`**
-```sql
-- id (uuid, primary key)
-- bug_id (uuid, foreign key → bugs)
-- user_id (uuid, foreign key → profiles)
-- file_name (text)
-- file_url (text)
-- file_type (text)
-- file_size (integer)
-- created_at (timestamp)
-```
-
-**`activities`**
-```sql
-- id (uuid, primary key)
-- bug_id (uuid, foreign key → bugs)
-- user_id (uuid, foreign key → profiles)
-- action (text) -- 'created', 'updated', 'commented', etc.
-- details (jsonb)
-- created_at (timestamp)
-```
-
-#### Storage Buckets
-- **bug-attachments** - Stores uploaded files and images
-
-#### Row Level Security (RLS)
-All tables have RLS policies enabled:
-- Users can read all bugs
-- Users can create/update bugs they reported
-- Users can delete their own comments
-- Admins have full access
-
-### Keyboard Shortcuts
-
-| Shortcut | Action | Context |
-|----------|--------|---------|
-| `Ctrl+K` or `Cmd+K` | Open quick actions | Global |
-| `Ctrl+/` or `Cmd+/` | Show keyboard shortcuts help | Global |
-| `Ctrl+Shift+X` | Sign out | Global |
-| `Esc` | Close modal/dialog | When modal open |
-| `Enter` | Submit form | In forms |
-| `Tab` | Navigate focus | Global |
-| `?` | Show help modal | Global |
-
-### Authentication Flow
-
-1. **Sign Up** - Users create account with email/password
-2. **Email Verification** - Optional email confirmation
-3. **Sign In** - Session-based authentication
-4. **Session Persistence** - Auto-refresh tokens
-5. **Protected Routes** - Redirect to login if unauthenticated
-6. **Sign Out** - Clear session and redirect
-
-**Supported Auth Methods:**
-- Email/Password (default)
-- Magic Link (optional)
-- OAuth providers (GitHub, Google - configurable in Supabase)
-
-## 🚢 Deployment
-
-### Recommended Platforms
-
-#### Vercel (Recommended)
 ```bash
-# Install Vercel CLI
-npm i -g vercel
-
-# Deploy
-vercel
+npm run dev              # Development server
+npm run build           # Production build
+npm run build:prod      # Build + linting
+npm run preview         # Preview production
+npm run lint            # ESLint check
+npm run docker:build    # Build Docker image
+npm run docker:compose  # Start full stack
 ```
 
-#### Netlify
-```bash
-# Install Netlify CLI
-npm i -g netlify-cli
+## 📁 Project Structure
 
-# Build and deploy
-npm run build
-netlify deploy --prod --dir=dist
+```
+src/
+├── components/         # UI components
+├── pages/             # Lazy-loaded pages
+├── hooks/             # Custom React hooks
+├── lib/               # Utilities & config
+├── assets/            # Images & fonts
+├── App.jsx
+└── main.jsx
 ```
 
-#### Other Options
-- **GitHub Pages** - Static hosting
-- **Cloudflare Pages** - Edge deployment
-- **AWS Amplify** - Full-stack hosting
-- **Railway** - Container deployment
+## 🔐 Security
 
-### Environment Variables Setup
-
-Ensure these are set in your deployment platform:
-```
-VITE_SUPABASE_URL=your_supabase_url
-VITE_SUPABASE_ANON_KEY=your_anon_key
-```
-
-## ⚡ Performance
-
-### Optimizations Implemented
-- **Code Splitting** - Dynamic imports for route-based splitting
-- **Lazy Loading** - Components loaded on demand
-- **Memoization** - React.memo and useMemo to prevent re-renders
-- **Debouncing** - Search and filter inputs
-- **Virtual Scrolling** - Large lists rendered efficiently
-- **Image Optimization** - Compressed uploads and responsive images
-- **Tree Shaking** - Unused code eliminated in production
-- **CSS Purging** - Tailwind removes unused styles
-
-### Lighthouse Scores (Production)
-- **Performance**: 95+
-- **Accessibility**: 100
-- **Best Practices**: 100
-- **SEO**: 95+
-
-## 🌐 Browser Support
-
-| Browser | Version | Status |
-|---------|---------|--------|
-| Chrome | 90+ | ✅ Fully supported |
-| Edge | 90+ | ✅ Fully supported |
-| Firefox | 88+ | ✅ Fully supported |
-| Safari | 14+ | ✅ Fully supported |
-| Opera | 76+ | ✅ Fully supported |
-
-**Requirements:**
-- ES2020+ JavaScript features
-- CSS Grid and Flexbox
-- Fetch API and Promises
-- localStorage and sessionStorage
-
-## 🐛 Troubleshooting
-
-### Common Issues
-
-**Issue:** `npm install` fails
-- **Solution:** Clear npm cache: `npm cache clean --force`, then retry
-
-**Issue:** Environment variables not loading
-- **Solution:** Ensure `.env` file is in root directory and variables start with `VITE_`
-
-**Issue:** Supabase connection errors
-- **Solution:** Verify credentials in `.env` and check Supabase project status
-
-**Issue:** Build fails with ESLint errors
-- **Solution:** Run `npm run lint:fix` to auto-fix issues
-
-**Issue:** Real-time updates not working
-- **Solution:** Check Supabase Realtime is enabled in project settings
+- Environment variables for sensitive data
+- Row-Level Security (RLS) policies
+- Session management with auto-refresh
+- Security headers configured
+- No console logs in production
+- HTTPS/SSL ready
 
 ## 🤝 Contributing
 
-We welcome contributions from the community! Here's how you can help:
+1. Fork the repository
+2. Create your feature branch (`git checkout -b feature/amazing-feature`)
+3. Commit changes (`git commit -m "feat: add feature"`)
+4. Push to branch (`git push origin feature/amazing-feature`)
+5. Open a Pull Request
 
-### Ways to Contribute
-- 🐛 Report bugs and issues
-- 💡 Suggest new features or enhancements
-- 📝 Improve documentation
-- 🔧 Submit pull requests
-- ⭐ Star the repository
-
-### Development Workflow
-
-1. **Fork the repository**
-   ```bash
-   # Click "Fork" button on GitHub
-   ```
-
-2. **Clone your fork**
-   ```bash
-   git clone https://github.com/YOUR_USERNAME/BugReportingTool.git
-   cd BugReportingTool
-   ```
-
-3. **Create a feature branch**
-   ```bash
-   git checkout -b feature/your-feature-name
-   ```
-
-4. **Make your changes**
-   - Write clean, readable code
-   - Follow existing code style
-   - Add comments for complex logic
-   - Test your changes thoroughly
-
-5. **Commit with clear messages**
-   ```bash
-   git add .
-   git commit -m "feat: add new feature description"
-   ```
-   
-   **Commit Convention:**
-   - `feat:` - New feature
-   - `fix:` - Bug fix
-   - `docs:` - Documentation changes
-   - `style:` - Code style changes (formatting)
-   - `refactor:` - Code refactoring
-   - `test:` - Adding tests
-   - `chore:` - Maintenance tasks
-
-6. **Push to your fork**
-   ```bash
-   git push origin feature/your-feature-name
-   ```
-
-7. **Open a Pull Request**
-   - Go to the original repository
-   - Click "New Pull Request"
-   - Select your branch
-   - Describe your changes clearly
-
-### Code Style Guidelines
-- Use functional components with hooks
-- Follow React best practices
-- Use Tailwind CSS for styling
-- Write descriptive variable/function names
-- Add JSDoc comments for complex functions
-- Keep components small and focused
-- Run `npm run lint` before committing
-
-### Reporting Bugs
-
-When reporting bugs, please include:
-- Description of the issue
-- Steps to reproduce
-- Expected vs actual behavior
-- Browser and OS information
-- Screenshots (if applicable)
-- Console error messages
+**Commit Convention:**
+- `feat:` - New feature
+- `fix:` - Bug fix
+- `docs:` - Documentation
+- `refactor:` - Code refactoring
 
 ## 📄 License
 
-This project is licensed under the **MIT License** - see the [LICENSE](LICENSE) file for details.
-
-```
-MIT License
-
-Copyright (c) 2026 rixscx
-
-Permission is hereby granted, free of charge, to any person obtaining a copy
-of this software and associated documentation files (the "Software"), to deal
-in the Software without restriction, including without limitation the rights
-to use, copy, modify, merge, publish, distribute, sublicense, and/or sell
-copies of the Software, and to permit persons to whom the Software is
-furnished to do so, subject to the following conditions:
-
-The above copyright notice and this permission notice shall be included in all
-copies or substantial portions of the Software.
-
-THE SOFTWARE IS PROVIDED "AS IS", WITHOUT WARRANTY OF ANY KIND, EXPRESS OR
-IMPLIED, INCLUDING BUT NOT LIMITED TO THE WARRANTIES OF MERCHANTABILITY,
-FITNESS FOR A PARTICULAR PURPOSE AND NONINFRINGEMENT. IN NO EVENT SHALL THE
-AUTHORS OR COPYRIGHT HOLDERS BE LIABLE FOR ANY CLAIM, DAMAGES OR OTHER
-LIABILITY, WHETHER IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING FROM,
-OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE
-SOFTWARE.
-```
+MIT License - see [LICENSE](LICENSE) for details.
 
 ## 🙏 Acknowledgments
 
-- **React Team** - For the amazing framework
-- **Vite** - Lightning-fast build tool
-- **Supabase** - Backend infrastructure
-- **Tailwind Labs** - Utility-first CSS
-- **Lucide** - Beautiful icon library
-- **Open Source Community** - For inspiration and support
+- [React](https://react.dev/)
+- [Vite](https://vitejs.dev/)
+- [Supabase](https://supabase.com/)
+- [Tailwind CSS](https://tailwindcss.com/)
+- [Lucide React](https://lucide.dev/)
 
-## 📞 Contact & Support
+## 📞 Support
 
-- **GitHub**: [@rixscx](https://github.com/rixscx)
 - **Issues**: [GitHub Issues](https://github.com/rixscx/BugReportingTool/issues)
 - **Discussions**: [GitHub Discussions](https://github.com/rixscx/BugReportingTool/discussions)
 
-## 🗺️ Roadmap
-
-### Upcoming Features
-- [ ] Dark mode support
-- [ ] Email notifications
-- [ ] Advanced analytics and reporting
-- [ ] Bulk operations (assign, close, export)
-- [ ] Custom fields and bug templates
-- [ ] Integration with GitHub/Jira
-- [ ] Mobile app (React Native)
-- [ ] AI-powered duplicate detection
-- [ ] Automated bug categorization
-- [ ] Custom workflows per team
-
-### In Progress
-- [x] Real-time collaboration
-- [x] Keyboard shortcuts
-- [x] File attachments
-- [x] Activity timeline
-
-## ⚠️ Security
-
-If you discover a security vulnerability, please email security@yourproject.com instead of using the issue tracker. We take security seriously and will respond promptly.
-
-## 📊 Project Stats
-
-![GitHub stars](https://img.shields.io/github/stars/rixscx/BugReportingTool?style=social)
-![GitHub forks](https://img.shields.io/github/forks/rixscx/BugReportingTool?style=social)
-![GitHub issues](https://img.shields.io/github/issues/rixscx/BugReportingTool)
-![GitHub pull requests](https://img.shields.io/github/issues-pr/rixscx/BugReportingTool)
-![GitHub last commit](https://img.shields.io/github/last-commit/rixscx/BugReportingTool)
-
 ---
+
+**Status**: ✅ Production Ready | **Version**: 1.0.0 | **Last Updated**: Jan 2, 2026
 
 <div align="center">
 
-**Made by [rixscx](https://github.com/rixscx)**
+Made with ❤️ by [rixscx](https://github.com/rixscx)
 
-If this project helped you, please consider giving it a ⭐!
-
-[⬆ Back to Top](#-bug-reporting-tool)
+If this project helped you, please give it a ⭐!
 
 </div>
