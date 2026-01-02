@@ -11,7 +11,7 @@ export default function Navbar({ session, userProfile, isAdmin }) {
   const location = useLocation()
   const navigate = useNavigate()
   const { showToast } = useToast()
-  const { isTestAccount, deleteAccount } = useAuth()
+  const { isTestAccount, deleteAccount, proceduralAvatarSeed } = useAuth()
   const deleteDialog = useConfirmDialog()
   const [showShortcutsHelp, setShowShortcutsHelp] = useState(false)
   const [showUserMenu, setShowUserMenu] = useState(false)
@@ -187,7 +187,7 @@ export default function Navbar({ session, userProfile, isAdmin }) {
                     />
                   ) : (
                     <img 
-                      src={generateAvatarUrl(session?.user?.id)}
+                      src={generateAvatarUrl(proceduralAvatarSeed || session?.user?.id)}
                       alt={userProfile?.username || 'User'}
                       className="w-9 h-9 rounded-xl ring-2 ring-white shadow-md"
                       loading="lazy"
@@ -210,7 +210,7 @@ export default function Navbar({ session, userProfile, isAdmin }) {
                         />
                       ) : (
                         <img 
-                          src={generateAvatarUrl(session?.user?.id)}
+                          src={generateAvatarUrl(proceduralAvatarSeed || session?.user?.id)}
                           alt={userProfile?.username || 'User'}
                           className="w-10 h-10 rounded-lg ring-1 ring-slate-200"
                           loading="lazy"

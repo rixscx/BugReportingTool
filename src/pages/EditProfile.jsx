@@ -9,7 +9,7 @@ import { AvatarCropper } from '../components/AvatarCropper'
 export default function EditProfile() {
   const navigate = useNavigate()
   const { showToast } = useToast()
-  const { userProfile, session, refetchProfile, updateProfileState } = useAuth()
+  const { userProfile, session, refetchProfile, updateProfileState, proceduralAvatarSeed, setProceduralAvatarSeed } = useAuth()
   
   const [username, setUsername] = useState('')
   const [fullName, setFullName] = useState('')
@@ -19,9 +19,6 @@ export default function EditProfile() {
   const [showCropper, setShowCropper] = useState(false)
   const [loading, setLoading] = useState(false)
   const [error, setError] = useState(null)
-  
-  // Procedural avatar seed (UI-only, never stored in DB)
-  const [proceduralSeed, setProceduralSeed] = useState(session?.user?.id || '')
 
   // Load profile data and generate default avatar if needed
   useEffect(() => {
@@ -29,14 +26,14 @@ export default function EditProfile() {
       setUsername(userProfile.username || (session?.user?.email?.split('@')[0] || ''))
       setFullName(userProfile.full_name || '')
       
-      // Use uploaded avatar if exists, otherwise generate procedural from seed
-      const finalAvatar = userProfile.avatar_url || (proceduralSeed ? generateAvatarUrl(proceduralSeed) : '')
+      // Use uploaded avatar if exists, otherwise generate procedural from shared seed
+      const finalAvatar = userProfile.avatar_url || (proceduralAvatarSeed ? generateAvatarUrl(proceduralAvatarSeed) : '')
       setAvatarUrl(finalAvatar)
-    } else if (proceduralSeed) {
-      // If profile hasn't loaded yet, generate procedural avatar from seed
-      setAvatarUrl(generateAvatarUrl(proceduralSeed))
+    } else if (proceduralAvatarSeed) {
+      // If profile hasn't loaded yet, generate procedural avatar from shared seed
+      setAvatarUrl(generateAvatarUrl(proceduralAvatarSeed))
     }
-  }, [userProfile, session?.user?.email, proceduralSeed])
+  }, [userProfile, session?.user?.email, proceduralAvatarSeed])
 
   const handleAvatarUpload = (e) => {
     const file = e.target.files?.[0]
@@ -97,22 +94,22 @@ export default function EditProfile() {
 
   const handleRemoveAvatar = () => {
     setAvatarFile(null)
-    // Regenerate procedural avatar from current seed
-    if (proceduralSeed) {
-      const generatedUrl = generateAvatarUrl(proceduralSeed)
+    // Regenerate procedural avatar from shared seed
+    if (proceduralAvatarSeed) {
+      const generatedUrl = generateAvatarUrl(proceduralAvatarSeed)
       setAvatarUrl(generatedUrl)
     }
   }
 
   /**
    * Generate new procedural avatar (UI-only, never stored)
-   * Creates a new random seed and re-renders avatar
+   * Creates a new random seed and updates shared state
    * Does NOT touch profiles.avatar_url
    */
   const handleGenerateNewAvatar = () => {
     // Generate new seed: userId + timestamp for randomness
     const newSeed = `${session?.user?.id}-${Date.now()}`
-    setProceduralSeed(newSeed)
+    setProceduralAvatarSeed(newSeed)
     
     // Clear any uploaded file since user wants procedural avatar
     setAvatarFile(null)

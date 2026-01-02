@@ -12,6 +12,9 @@ export function useAuth() {
   const [loading, setLoading] = useState(true)
   const fetchingRef = useRef(false)
   const lastFetchedUserIdRef = useRef(null)
+  
+  // Shared procedural avatar seed (UI-only, not persisted)
+  const [proceduralAvatarSeed, setProceduralAvatarSeed] = useState(null)
 
   const fetchUserProfile = useCallback(async (userId, userEmail, userMetadata) => {
     // Prevent duplicate fetches for the same user
@@ -117,6 +120,8 @@ export function useAuth() {
       if (!isMounted) return
       setSession(session)
       if (session?.user) {
+        // Set initial procedural avatar seed to userId
+        setProceduralAvatarSeed(session.user.id)
         fetchUserProfile(session.user.id, session.user.email, session.user.user_metadata)
       } else {
         setLoading(false)
@@ -128,6 +133,8 @@ export function useAuth() {
         if (!isMounted) return
         setSession(session)
         if (session?.user) {
+          // Reset seed to userId on auth change
+          setProceduralAvatarSeed(session.user.id)
           fetchUserProfile(session.user.id, session.user.email, session.user.user_metadata)
         } else {
           setUserProfile(null)
@@ -196,6 +203,8 @@ export function useAuth() {
     isAdmin,
     isAuthenticated,
     isTestAccount,
+    proceduralAvatarSeed,
+    setProceduralAvatarSeed,
     signOut,
     deleteAccount,
     refetchProfile: async () => {
