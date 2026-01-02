@@ -61,6 +61,7 @@ function AppContent() {
     return (
       <Routes>
         <Route path="/" element={<Auth />} />
+        <Route path="/auth/callback" element={<Auth />} />
         <Route path="*" element={<Navigate to="/" replace />} />
       </Routes>
     )
