@@ -12,6 +12,31 @@ import CommentSection from '../components/CommentSection'
 import ActivityTimeline from '../components/ActivityTimeline'
 import { formatSmartDate } from '../lib/dateUtils'
 
+// Simple markdown renderer for bold text
+const renderMarkdown = (text) => {
+  if (!text) return null
+  
+  // Split by bold patterns (**text** or __text__)
+  const parts = text.split(/(\*\*.*?\*\*|__.*?__)/g)
+  
+  return parts.map((part, index) => {
+    // Check if this part is bold
+    if (part.startsWith('**') && part.endsWith('**')) {
+      return <strong key={index} className="font-semibold text-slate-800">{part.slice(2, -2)}</strong>
+    }
+    if (part.startsWith('__') && part.endsWith('__')) {
+      return <strong key={index} className="font-semibold text-slate-800">{part.slice(2, -2)}</strong>
+    }
+    // Regular text - preserve line breaks
+    return part.split('\n').map((line, i, arr) => (
+      <span key={`${index}-${i}`}>
+        {line}
+        {i < arr.length - 1 && <br />}
+      </span>
+    ))
+  })
+}
+
 export default function BugDetail({ session, isAdmin }) {
   const { id } = useParams()
   const navigate = useNavigate()
@@ -263,13 +288,17 @@ export default function BugDetail({ session, isAdmin }) {
 
               <div className="prose prose-slate max-w-none">
                 <h3 className="text-sm font-semibold text-slate-700 mb-2">Description</h3>
-                <p className="text-slate-600 whitespace-pre-wrap text-sm leading-relaxed">{bug.description}</p>
+                <div className="text-slate-600 text-sm leading-relaxed">
+                  {renderMarkdown(bug.description)}
+                </div>
               </div>
 
               {bug.steps_to_reproduce && (
                 <div className="mt-6 pt-6 border-t border-slate-100">
                   <h3 className="text-sm font-semibold text-slate-700 mb-2">Steps to Reproduce</h3>
-                  <p className="text-slate-600 whitespace-pre-wrap text-sm leading-relaxed">{bug.steps_to_reproduce}</p>
+                  <div className="text-slate-600 text-sm leading-relaxed">
+                    {renderMarkdown(bug.steps_to_reproduce)}
+                  </div>
                 </div>
               )}
 

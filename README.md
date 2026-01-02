@@ -92,6 +92,19 @@ git push origin main
 # Visit vercel.com, import repo, set env vars, deploy!
 ```
 
+**Environment Variables for Vercel:**
+- `VITE_SUPABASE_URL` - Your Supabase project URL
+- `VITE_SUPABASE_ANON_KEY` - Your Supabase anon key
+
+**Important Setup Steps:**
+1. Deploy to Vercel and get your URL (e.g., `https://bugreporttool.vercel.app`)
+2. Go to **Supabase Dashboard** → **Authentication** → **URL Configuration**
+3. Add to **Redirect URLs**:
+   - `https://your-app.vercel.app/`
+   - `https://your-app.vercel.app/auth/callback`
+4. Set **Site URL** to: `https://your-app.vercel.app`
+5. Click **Save**
+
 ### Docker
 ```bash
 cp .env.example .env.production
@@ -142,6 +155,24 @@ src/
 - Security headers configured
 - No console logs in production
 - HTTPS/SSL ready
+- PKCE flow for OAuth
+- Automatic session detection
+
+## 🔑 Google OAuth Setup (Optional)
+
+1. **Google Cloud Console**:
+   - Go to [Google Cloud Console](https://console.cloud.google.com/)
+   - Create OAuth Client ID (Web application)
+   - Add authorized origins: `https://YOUR-PROJECT.supabase.co`
+   - Add redirect URI: `https://YOUR-PROJECT.supabase.co/auth/v1/callback`
+
+2. **Supabase Dashboard**:
+   - Go to **Authentication** → **Providers**
+   - Enable **Google**
+   - Paste Client ID and Client Secret
+   - Save
+
+3. **Test**: Click "Sign in with Google" button in your app!
 
 ## 🤝 Contributing
 
