@@ -10,7 +10,7 @@ export function useAuth() {
   const [userProfile, setUserProfile] = useState(null)
   const [loading, setLoading] = useState(true)
 
-  const fetchUserProfile = useCallback(async (userId) => {
+  const fetchUserProfile = useCallback(async (userId, userEmail, userMetadata) => {
     try {
       const { data, error } = await supabase
         .from('profiles')
@@ -18,9 +18,32 @@ export function useAuth() {
         .eq('id', userId)
         .single()
 
-      if (error) throw error
-      setUserProfile(data)
-    } catch {
+      if (error) {
+        // Profile doesn't exist, create one (for OAuth users)
+        if (error.code === 'PGRST116') {
+          const { data: newProfile, error: insertError } = await supabase
+            .from('profiles')
+            .insert({
+              id: userId,
+              email: userEmail,
+              username: userEmail.split('@')[0],
+              role: 'user',
+              avatar_url: userMetadata?.avatar_url || null,
+              full_name: userMetadata?.full_name || null,
+            })
+            .select()
+            .single()
+
+          if (insertError) throw insertError
+          setUserProfile(newProfile)
+        } else {
+          throw error
+        }
+      } else {
+        setUserProfile(data)
+      }
+    } catch (err) {
+      console.error('Error fetching/creating profile:', err)
       setUserProfile(null)
     } finally {
       setLoading(false)
@@ -31,7 +54,7 @@ export function useAuth() {
     supabase.auth.getSession().then(({ data: { session } }) => {
       setSession(session)
       if (session?.user) {
-        fetchUserProfile(session.user.id)
+        fetchUserProfile(session.user.id, session.user.email, session.user.user_metadata)
       } else {
         setLoading(false)
       }
@@ -40,7 +63,7 @@ export function useAuth() {
       (_event, session) => {
         setSession(session)
         if (session?.user) {
-          fetchUserProfile(session.user.id)
+          fetchUserProfile(session.user.id, session.user.email, session.user.user_metadata)
         } else {
           setUserProfile(null)
           setLoading(false)

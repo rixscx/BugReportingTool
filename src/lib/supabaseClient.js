@@ -9,4 +9,11 @@ if (!supabaseUrl || !supabaseAnonKey) {
   console.error('Make sure to set these in your .env file or deployment platform')
 }
 
-export const supabase = createClient(supabaseUrl || '', supabaseAnonKey || '')
+export const supabase = createClient(supabaseUrl || '', supabaseAnonKey || '', {
+  auth: {
+    autoRefreshToken: true,
+    persistSession: true,
+    detectSessionInUrl: true,
+    flowType: 'pkce'
+  }
+})
