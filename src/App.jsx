@@ -58,8 +58,8 @@ function AppContent() {
   if (!session) {
     return (
       <Routes>
-        <Route path="/auth" element={<Auth />} />
-        <Route path="*" element={<Navigate to="/auth" replace />} />
+        <Route path="/" element={<Auth />} />
+        <Route path="*" element={<Navigate to="/" replace />} />
       </Routes>
     )
   }
