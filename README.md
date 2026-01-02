@@ -610,7 +610,7 @@ SOFTWARE.
 
 ## ⚠️ Security
 
-If you discover a security vulnerability, please email security@yourproject.com instead of using the issue tracker. We take security seriously and will respond promptly.
+If you discover a security vulnerability, please email livinell73@gmail.com instead of using the issue tracker. We take security seriously and will respond promptly.
 
 ## 📊 Project Stats
 
