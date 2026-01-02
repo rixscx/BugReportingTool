@@ -63,10 +63,14 @@ export default function Auth() {
     setError(null)
     
     try {
+      // PHASE A – OAuth Redirect Hardening: Detect localhost vs production
+      const isLocalhost = window.location.hostname === 'localhost' || window.location.hostname === '127.0.0.1'
+      const redirectUrl = isLocalhost ? window.location.origin + '/' : 'https://bugtracker-vercel.vercel.app/'
+      
       const { error } = await supabase.auth.signInWithOAuth({
         provider: 'google',
         options: {
-          redirectTo: `${window.location.origin}/`,
+          redirectTo: redirectUrl,
           queryParams: {
             access_type: 'offline',
             prompt: 'consent',
@@ -114,21 +118,19 @@ export default function Auth() {
         }
 
         if (data.user) {
-          // GUARDRAIL #1: NEVER persist procedural avatar to database
+          // PHASE 1: NEVER persist procedural avatar to database
           // avatar_url must be null for new signups - procedural is view-only
-          const { error: profileError } = await supabase.from('profiles').upsert({
+          const { error: profileError } = await supabase.from('profiles').insert({
             id: data.user.id,
             email: data.user.email,
             username: email.split('@')[0],
             role: isAdminSignUp ? 'admin' : 'user',
             avatar_url: null,  // VERIFIED: procedural avatar NOT persisted
-          }, { onConflict: 'id' })
+          })
 
           if (profileError) {
-            await supabase
-              .from('profiles')
-              .update({ role: isAdminSignUp ? 'admin' : 'user' })
-              .eq('id', data.user.id)
+            console.error('❌ PHASE 2 - PROFILE HEALING REMOVED: Failed to create profile row:', profileError)
+            throw new Error(`Database error: Failed to create profile. ${profileError.message}`)
           }
 
           setSuccess(`Account created as ${isAdminSignUp ? 'Admin' : 'User'}! You can now sign in.`)

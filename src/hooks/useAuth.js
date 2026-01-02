@@ -2,6 +2,17 @@ import { useState, useEffect, useCallback, useRef } from 'react'
 import { supabase } from '../lib/supabaseClient'
 import { generateAvatarUrl } from '../lib/avatarUtils'
 
+// AVATAR INVARIANTS (DO NOT BREAK):
+// - profiles.avatar_url stores ONLY provider or user-uploaded avatars
+// - Procedural avatars are memory-only; never persisted
+// - OAuth users must never receive procedural seeds
+// PROFILE INVARIANTS:
+// - Profiles are created only at signup
+// - Fetch must never mutate DB; missing profile is a hard error
+// AUTH INVARIANTS:
+// - OAuth redirects are explicit; no localhost in production
+// - No partial auth states
+
 /**
  * Custom hook for authentication state management
  * Provides session, user profile, and auth utilities
@@ -53,69 +64,10 @@ export function useAuth() {
         throw new Error(`Database access denied. Please contact support. (${error.code})`)
       }
 
-      // INVARIANT ENFORCED: Profile must exist in database OR be creatable
-      // Frontend MUST NEVER fabricate profile data
+      // INVARIANT ENFORCED: Profile must exist already (no healing/upserts on read)
       const noProfile = (!data && !error) || error?.code === 'PGRST116'
-
       if (noProfile) {
-        // PHASE 3 — OAUTH FIX: Profile doesn't exist - create for OAuth/new users
-        // This handles both email/password signup AND OAuth (Google) login
-        console.log('📝 PHASE 3 — OAUTH FIX: Creating profile for user:', { userId, userEmail, provider: userMetadata?.iss })
-        
-        const { data: newProfile, error: insertError } = await supabase
-          .from('profiles')
-          .insert({
-            id: userId,
-            email: userEmail,
-            username: usernameFromEmail,
-            role: 'user',
-            avatar_url: null, // INVARIANT: avatar_url must be null, never procedural
-            full_name: userMetadata?.full_name || null,
-          })
-          .select()
-          .single()
-
-        if (insertError) {
-          // PHASE 3 — OAUTH FIX: Handle duplicate key errors gracefully for OAuth
-          const isDuplicate = insertError.code === '23505' || insertError.message?.includes('duplicate')
-          
-          if (isDuplicate) {
-            // Profile was created by another tab/session - refetch it
-            console.warn('⚠️ PHASE 3 — OAUTH FIX: Profile exists (race condition), refetching...', { userId })
-            const { data: existingProfile, error: refetchError } = await supabase
-              .from('profiles')
-              .select('*')
-              .eq('id', userId)
-              .maybeSingle()
-            
-            if (refetchError || !existingProfile) {
-              console.error('❌ PHASE 3 — OAUTH FIX: Failed to refetch profile after race:', refetchError)
-              throw new Error('Profile creation race condition - please refresh')
-            }
-            
-            setUserProfile(existingProfile)
-            return
-          }
-          
-          // INVARIANT ENFORCED: Profile insert failed - DO NOT fabricate fallback
-          console.error('❌ PHASE 3 — OAUTH FIX: Profile insert failed:', {
-            code: insertError.code,
-            message: insertError.message,
-            details: insertError.details,
-            hint: insertError.hint,
-            userId,
-            userEmail
-          })
-          throw new Error(`INVARIANT VIOLATION: Failed to create profile. ${insertError.message} (${insertError.code})`)
-        }
-        
-        // INVARIANT ENFORCED: Profile MUST come from database
-        if (!newProfile || !newProfile.id) {
-          throw new Error('INVARIANT VIOLATION: profiles row missing after insert. Frontend must not fabricate profiles.')
-        }
-        
-        setUserProfile(newProfile)
-        return
+        throw new Error('INVARIANT VIOLATION: profile missing for authenticated user')
       }
 
       if (error) {
@@ -133,9 +85,33 @@ export function useAuth() {
         throw new Error('INVARIANT VIOLATION: profiles row missing. Frontend must not fabricate profiles.')
       }
 
+      // OAuth avatar source of truth: persist provider avatar once if missing
+      const provider = userMetadata?.provider || userMetadata?.iss || ''
+      const isGoogleProvider = typeof provider === 'string' && provider.toLowerCase().includes('google')
+      let profileData = data
+
+      if (isGoogleProvider && !data.avatar_url && userMetadata?.avatar_url) {
+        const { data: updatedProfile, error: avatarUpdateError } = await supabase
+          .from('profiles')
+          .update({ avatar_url: userMetadata.avatar_url })
+          .eq('id', userId)
+          .select()
+          .maybeSingle()
+
+        if (avatarUpdateError) {
+          console.error('❌ OAUTH AVATAR SYNC FAILED:', {
+            code: avatarUpdateError.code,
+            message: avatarUpdateError.message,
+            userId
+          })
+        } else if (updatedProfile?.avatar_url) {
+          profileData = updatedProfile
+        }
+      }
+
       // Use profile data as-is from database, avatar_url may be null (valid state)
       // Profiles must ONLY come from database.
-      setUserProfile(data)
+      setUserProfile(profileData)
     } catch (err) {
       // PHASE 2 FIX: Fatal errors should surface to user - no silent fallback
       console.error('❌ PHASE 2: Fatal profile error:', err)
@@ -165,13 +141,19 @@ export function useAuth() {
       setSession(session)
       
       if (session?.user?.id) {
+        const provider = session.user.app_metadata?.provider || session.user.user_metadata?.provider || session.user.user_metadata?.iss || ''
+        const isGoogleProvider = typeof provider === 'string' && provider.toLowerCase().includes('google')
         // PHASE 3 — OAUTH FIX: Validate session has required fields before profile fetch
         if (!session.user.email) {
           console.warn('⚠️ PHASE 3 — OAUTH FIX: Session missing email, using id as fallback')
         }
-        
-        // PHASE 2 — PROCEDURAL AVATAR FIX: Set initial seed to userId on login
-        setProceduralAvatarSeed(session.user.id)
+
+        // Procedural avatars only for non-OAuth users
+        if (!isGoogleProvider) {
+          setProceduralAvatarSeed(session.user.id)
+        } else {
+          setProceduralAvatarSeed(null)
+        }
         
         // PHASE 3 — AUTH RACE FIX: Fetch profile only after session is confirmed stable
         fetchUserProfile(session.user.id, session.user.email, session.user.user_metadata)
@@ -191,13 +173,19 @@ export function useAuth() {
         setSession(session)
         
         if (session?.user?.id) {
+          const provider = session.user.app_metadata?.provider || session.user.user_metadata?.provider || session.user.user_metadata?.iss || ''
+          const isGoogleProvider = typeof provider === 'string' && provider.toLowerCase().includes('google')
           // PHASE 3 — AUTH RACE FIX: Validate session before processing
           if (!session.user.email && event !== 'TOKEN_REFRESHED') {
             console.warn('⚠️ PHASE 3 — OAUTH FIX: Session missing email on event:', event)
           }
           
-          // PHASE 2 — PROCEDURAL AVATAR FIX: Reset seed to userId on auth change
-          setProceduralAvatarSeed(session.user.id)
+          // Procedural avatars only for non-OAuth users
+          if (!isGoogleProvider) {
+            setProceduralAvatarSeed(session.user.id)
+          } else {
+            setProceduralAvatarSeed(null)
+          }
           
           // PHASE 3 — PERF POLISH: Only fetch profile on SIGNED_IN or INITIAL_SESSION
           // Skip fetch on TOKEN_REFRESHED if we already have the profile

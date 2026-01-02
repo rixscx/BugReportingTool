@@ -11,6 +11,8 @@ export default function EditProfile() {
   const { showToast } = useToast()
   // PHASE 2 — PROCEDURAL AVATAR FIX: Get seed from single source of truth (useAuth)
   const { userProfile, session, refetchProfile, proceduralAvatarSeed, setProceduralAvatarSeed, loading: profileLoading } = useAuth()
+  const provider = session?.user?.app_metadata?.provider || session?.user?.user_metadata?.provider || session?.user?.user_metadata?.iss || ''
+  const isOAuthGoogle = typeof provider === 'string' && provider.toLowerCase().includes('google')
   
   const [username, setUsername] = useState('')
   const [fullName, setFullName] = useState('')
@@ -122,6 +124,7 @@ export default function EditProfile() {
    */
   const handleGenerateNewAvatar = () => {
     if (!session?.user?.id) return
+    if (isOAuthGoogle) return // OAuth users must use provider/uploaded avatar
     
     // Generate new seed: userId + timestamp for randomness
     const newSeed = `${session.user.id}-${Date.now()}`
@@ -144,10 +147,10 @@ export default function EditProfile() {
     setError(null)
 
     try {
-      // PHASE 2 — PROCEDURAL AVATAR FIX: Use memoized procedural avatar as fallback
-      // Note: procedural avatars are NEVER saved to database
-      let finalAvatarUrl = avatarUrl || proceduralAvatarUrl || ''
 
+      // PHASE 1: NEVER persist procedural avatar to database
+      // If user doesn't upload, keep existing uploaded avatar or null
+      let finalAvatarUrl = userProfile?.avatar_url ?? null
       // If user uploaded a new avatar, upload to Supabase Storage
       if (avatarFile) {
         // Get display name for filename: full_name > username > 'avatar'
@@ -197,43 +200,15 @@ export default function EditProfile() {
         .eq('id', session.user.id)
         .select()
 
-      let dbUpdateSucceeded = !updateError
-
       if (updateError) {
-        console.warn('Update error:', updateError.code, updateError.message)
-        // If update fails due to RLS (409, PGRST301), missing row, or 0 rows, try upsert as fallback
-        if (updateError.code === 'PGRST116' || updateError.code === '409' || updateError.code === 'PGRST301' || updateError.message?.includes('0 rows') || updateError.message?.includes('permission')) {
-          console.log('Attempting upsert fallback...')
-          const { error: upsertError } = await supabase
-            .from('profiles')
-            .upsert({
-              id: session.user.id,
-              email: session.user.email,
-              ...updateData,
-            }, { onConflict: 'id' })
-          
-          if (upsertError) {
-            console.error('Upsert also failed:', upsertError.code, upsertError.message)
-            showToast('Could not save to database. Please contact support.', 'error')
-            setLoading(false)
-            return
-          }
-          console.log('Upsert succeeded')
-          dbUpdateSucceeded = true
-        } else if (updateError.message?.includes('could not find')) {
-          throw new Error('Database schema issue. Please contact support.')
-        } else {
-          console.error('Unexpected update error:', updateError)
-          throw updateError
-        }
-      } else {
-        console.log('Update succeeded')
+        console.error('❌ Profile update failed:', {
+          code: updateError.code,
+          message: updateError.message,
+        })
+        throw updateError
       }
 
-      // Only show success if database update actually worked
-      if (dbUpdateSucceeded) {
-        showToast('Profile updated successfully!', 'success')
-      }
+      showToast('Profile updated successfully!', 'success')
       
       // PHASE 2 FIX: Removed updateProfileState - let DB be single source of truth
       // Refetch profile from database to ensure consistency
@@ -346,7 +321,7 @@ export default function EditProfile() {
               </label>
               
               {/* Generate new procedural avatar button (UI-only) */}
-              {!avatarFile && (
+              {!avatarFile && profileLoading === false && !isOAuthGoogle && (
                 <button
                   type="button"
                   onClick={handleGenerateNewAvatar}

@@ -31,3 +31,22 @@ export const generateAvatarWithStyle = (seed, style = 'geometric') => {
   const styledSeed = `${style}-${seed}`
   return generateAvatarDataURL(styledSeed, 90)
 }
+
+/**
+ * Resolve avatar URL based on invariant priority:
+ * 1) OAuth provider avatar (if OAuth user AND provider avatar exists)
+ * 2) User-uploaded avatar
+ * 3) Procedural avatar for non-OAuth users only
+ * 4) Otherwise null (render placeholder)
+ */
+export const resolveAvatar = ({
+  isOAuthUser,
+  providerAvatarUrl,
+  uploadedAvatarUrl,
+  proceduralAvatarUrl,
+}) => {
+  if (isOAuthUser && providerAvatarUrl) return providerAvatarUrl
+  if (uploadedAvatarUrl) return uploadedAvatarUrl
+  if (!isOAuthUser && proceduralAvatarUrl) return proceduralAvatarUrl
+  return null
+}
