@@ -1,5 +1,6 @@
 import { useState } from 'react'
 import { supabase } from '../lib/supabaseClient'
+import { generateAvatarUrl } from '../lib/avatarUtils'
 
 export default function Auth() {
   const [loading, setLoading] = useState(false)
@@ -118,6 +119,7 @@ export default function Auth() {
             email: data.user.email,
             username: email.split('@')[0],
             role: isAdminSignUp ? 'admin' : 'user',
+            avatar_url: generateAvatarUrl(data.user.id),
           }, { onConflict: 'id' })
 
           if (profileError) {

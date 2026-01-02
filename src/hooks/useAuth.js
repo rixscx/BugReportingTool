@@ -1,5 +1,6 @@
 import { useState, useEffect, useCallback } from 'react'
 import { supabase } from '../lib/supabaseClient'
+import { generateAvatarUrl } from '../lib/avatarUtils'
 
 /**
  * Custom hook for authentication state management
@@ -28,7 +29,7 @@ export function useAuth() {
               email: userEmail,
               username: userEmail.split('@')[0],
               role: 'user',
-              avatar_url: userMetadata?.avatar_url || null,
+              avatar_url: userMetadata?.avatar_url || generateAvatarUrl(userId),
               full_name: userMetadata?.full_name || null,
             })
             .select()
