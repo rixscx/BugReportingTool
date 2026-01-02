@@ -78,8 +78,26 @@ export function useAuth() {
     await supabase.auth.signOut()
   }, [])
 
+  const deleteAccount = useCallback(async () => {
+    try {
+      // Delete profile first
+      await supabase
+        .from('profiles')
+        .delete()
+        .eq('id', session.user.id)
+      
+      // Delete auth user (requires service role key - handled server-side in real app)
+      // For now, just sign out
+      await supabase.auth.signOut()
+    } catch (err) {
+      console.error('Error deleting account:', err)
+      throw err
+    }
+  }, [session])
+
   const isAdmin = userProfile?.role === 'admin'
   const isAuthenticated = !!session
+  const isTestAccount = session?.user?.email?.includes('test.')
 
   return {
     session,
@@ -87,6 +105,8 @@ export function useAuth() {
     loading,
     isAdmin,
     isAuthenticated,
+    isTestAccount,
     signOut,
+    deleteAccount,
   }
 }

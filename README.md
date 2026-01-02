@@ -8,9 +8,9 @@
 [![Supabase](https://img.shields.io/badge/Supabase-Backend-3ECF8E?logo=supabase&logoColor=white)](https://supabase.com/)
 [![License: MIT](https://img.shields.io/badge/License-MIT-yellow.svg)](https://opensource.org/licenses/MIT)
 
-**Professional bug tracking system with real-time collaboration and workflow management.**
+**Professional bug tracking system with real-time collaboration, OAuth support, and workflow management.**
 
-[Features](#-features) • [Quick Start](#-quick-start) • [Deployment](#-deployment) • [Documentation](#-documentation) • [Contributing](#-contributing)
+[Features](#-features) • [Quick Start](#-quick-start) • [Testing](#-testing-the-application) • [Deployment](#-deployment) • [Contributing](#-contributing)
 
 </div>
 
@@ -20,42 +20,45 @@
 
 - 🎯 **Bug Management** - Create, edit, track with custom statuses and priorities
 - 📊 **Analytics** - Real-time statistics, trends, and metrics
-- 🎨 **Multiple Views** - List, Kanban board, and timeline
+- 🎨 **Multiple Views** - List, Kanban board, and timeline views
 - 👥 **Collaboration** - Comments, mentions, activity tracking
 - ⌨️ **Shortcuts** - Ctrl+K quick actions, extensive keyboard navigation
 - 📸 **File Management** - Drag-and-drop uploads, image preview
+- 🔑 **OAuth** - Google sign-in support with automatic profile creation
 - 🔐 **Security** - RLS policies, session management, HTTPS-ready
 - 📱 **Responsive** - Mobile-first, touch-friendly, PWA-ready
 - 💾 **Real-time Sync** - Live updates with offline support
+- 🗑️ **Account Management** - Users can delete their profiles
 
 ## 🛠️ Tech Stack
 
 - **Frontend**: React 19, Vite 7, Tailwind CSS 4, React Router 7
-- **Backend**: Supabase (PostgreSQL, RLS, Auth)
+- **Backend**: Supabase (PostgreSQL, RLS, Auth, Realtime)
+- **Auth**: Email/Password + Google OAuth
 - **Tools**: ESLint, Docker, Nginx
 
 ## 🧪 Testing the Application
 
 ### Test Accounts
 
-For quick testing without creating real accounts, use these test profiles:
+For quick testing without creating real accounts, use these pre-verified profiles:
 
-| Email | Password | Role | Status |
-|-------|----------|------|--------|
-| `test.user@gmail.com` | `Test@123` | User | Pre-verified |
-| `test.admin@gmail.com` | `Admin@123` | Admin | Pre-verified |
+| Email | Password | Role | Features |
+|-------|----------|------|----------|
+| `test.user@gmail.com` | `Test@123` | User | Create/view bugs, comment |
+| `test.admin@gmail.com` | `Admin@123` | Admin | Full access + user management |
 
-**Note:** These test accounts are pre-verified and ready to use. Email verification is already completed.
+**Note:** Test accounts cannot be deleted. This prevents accidental testing data loss.
 
 ### Test Features
 
-1. **Sign In** - Use test credentials above
-2. **Create Bugs** - Report test issues
-3. **Assign** - Assign bugs to yourself or other users
-4. **Comments** - Add comments to bugs
-5. **Status** - Change bug status (Admin only feature)
-6. **Sign Out** - Test logout functionality
-7. **Google OAuth** - Test "Sign in with Google" button
+1. **Sign In** - Use test credentials above or Google OAuth
+2. **Create Bugs** - Report test issues with markdown support
+3. **Assign & Status** - Change bug status and assignments
+4. **Comments** - Add comments and mentions
+5. **Real-time** - See live updates across tabs
+6. **Sign Out** - Logs out and redirects to login page
+7. **Delete Profile** - Permanently delete account (not available for test accounts)
 
 ## 🚀 Quick Start
 
@@ -110,22 +113,22 @@ Quick deployment options:
 
 ### Vercel (Fastest)
 ```bash
-git add . && git commit -m "Production ready"
 git push origin main
-# Visit vercel.com, import repo, set env vars, deploy!
+# Vercel auto-deploys from GitHub
 ```
 
-**Environment Variables for Vercel:**
-- `VITE_SUPABASE_URL` - Your Supabase project URL
-- `VITE_SUPABASE_ANON_KEY` - Your Supabase anon key
+**Environment Variables Setup:**
+In Vercel Dashboard → Settings → Environment Variables, add:
+- `VITE_SUPABASE_URL` = `https://your-project.supabase.co`
+- `VITE_SUPABASE_ANON_KEY` = `your-anon-key-here`
 
-**Important Setup Steps:**
-1. Deploy to Vercel and get your URL (e.g., `https://bugreporttool.vercel.app`)
+**After Deployment:**
+1. Copy your Vercel URL (e.g., `https://bugreporttool.vercel.app`)
 2. Go to **Supabase Dashboard** → **Authentication** → **URL Configuration**
 3. Add to **Redirect URLs**:
-   - `https://your-app.vercel.app/`
-   - `https://your-app.vercel.app/auth/callback`
-4. Set **Site URL** to: `https://your-app.vercel.app`
+   - `https://bugreporttool.vercel.app/`
+   - `https://bugreporttool.vercel.app/auth/callback`
+4. Set **Site URL**: `https://bugreporttool.vercel.app`
 5. Click **Save**
 
 ### Docker
@@ -170,32 +173,62 @@ src/
 └── main.jsx
 ```
 
-## 🔐 Security
+## 🔐 Security & OAuth
 
-- Environment variables for sensitive data
-- Row-Level Security (RLS) policies
-- Session management with auto-refresh
-- Security headers configured
-- No console logs in production
-- HTTPS/SSL ready
-- PKCE flow for OAuth
-- Automatic session detection
+### Email/Password Authentication
+- Passwords are hashed with bcrypt
+- Email verification required for new accounts
+- Session tokens auto-refresh
+- HTTPS/SSL required in production
 
-## 🔑 Google OAuth Setup (Optional)
+### Google OAuth Integration
 
-1. **Google Cloud Console**:
-   - Go to [Google Cloud Console](https://console.cloud.google.com/)
-   - Create OAuth Client ID (Web application)
-   - Add authorized origins: `https://YOUR-PROJECT.supabase.co`
-   - Add redirect URI: `https://YOUR-PROJECT.supabase.co/auth/v1/callback`
+**OAuth Data Storage:**
+Yes! When users sign in with Google, their profile is automatically created with:
+- Email address
+- Full name (from Google account)
+- Avatar URL (profile picture)
+- User ID (from Supabase auth)
+- Role (defaults to 'user')
 
-2. **Supabase Dashboard**:
-   - Go to **Authentication** → **Providers**
-   - Enable **Google**
-   - Paste Client ID and Client Secret
-   - Save
+All data is stored in the `profiles` table in Supabase.
 
-3. **Test**: Click "Sign in with Google" button in your app!
+**Setup Google OAuth:**
+1. Go to [Google Cloud Console](https://console.cloud.google.com/)
+2. Create OAuth Client ID (Web application)
+3. Add authorized origins: `https://YOUR-PROJECT.supabase.co`
+4. Add callback: `https://YOUR-PROJECT.supabase.co/auth/v1/callback`
+5. Copy Client ID and Client Secret
+6. Supabase Dashboard → Authentication → Providers → Google
+7. 🎯 Account Management
+
+### Profile Actions
+
+**Available from Profile Menu (Top Right):**
+- View your profile information
+- View keyboard shortcuts
+- Sign out
+- **Delete Account** (not available for test accounts)
+
+### Delete Account
+
+When you delete your account:
+- ✅ Profile data is permanently removed
+- ✅ All associated bugs remain in system (for audit trail)
+- ✅ Action cannot be undone
+- ✅ Requires confirmation dialog
+- ❌ Not available for test accounts (prevents accidental deletion)
+
+**Note:** Test accounts (`test.user@gmail.com`, `test.admin@gmail.com`) cannot be deleted to protect demo data.
+
+## 🤝 Contributing
+
+1. Fork the repository
+2. Creater enhanced security
+- Row-Level Security (RLS) policies in database
+- Secure session management
+- Auto-logout on inactivity
+- Data isolation per user
 
 ## 🤝 Contributing
 

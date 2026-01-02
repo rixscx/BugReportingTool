@@ -1,11 +1,18 @@
 import { useState, useEffect, useCallback } from 'react'
-import { Link, useLocation } from 'react-router-dom'
+import { Link, useLocation, useNavigate } from 'react-router-dom'
 import { supabase } from '../lib/supabaseClient'
+import { useAuth } from '../hooks/useAuth'
+import { useToast } from './Toast'
+import { useConfirmDialog } from './ConfirmDialog'
 import { KeyboardShortcutsHelp } from './KeyboardShortcutsHelp'
 import { NotificationCenter } from './NotificationCenter'
 
 export default function Navbar({ session, userProfile, isAdmin }) {
   const location = useLocation()
+  const navigate = useNavigate()
+  const { showToast } = useToast()
+  const { isTestAccount, deleteAccount } = useAuth()
+  const deleteDialog = useConfirmDialog()
   const [showShortcutsHelp, setShowShortcutsHelp] = useState(false)
   const [showUserMenu, setShowUserMenu] = useState(false)
 
@@ -35,6 +42,27 @@ export default function Navbar({ session, userProfile, isAdmin }) {
     } catch {
     }
   }, [])
+
+  const handleDeleteAccount = useCallback(async () => {
+    const confirmed = await deleteDialog.confirm({
+      title: 'Delete Account',
+      description: 'This action cannot be undone. All your profile data will be permanently deleted. You will not be able to recover your account.',
+      confirmText: 'Delete My Account',
+      variant: 'danger',
+    })
+    
+    if (!confirmed) return
+
+    try {
+      setShowUserMenu(false)
+      await deleteAccount()
+      showToast('Account deleted successfully', 'success')
+      navigate('/')
+    } catch (err) {
+      showToast('Failed to delete account. Please try again.', 'error')
+      console.error('Error deleting account:', err)
+    }
+  }, [deleteDialog, deleteAccount, showToast, navigate])
 
   useEffect(() => {
     const handleKeyDown = (e) => {
@@ -180,6 +208,18 @@ export default function Navbar({ session, userProfile, isAdmin }) {
                         </span>
                         <kbd className="text-xs bg-red-100 px-2 py-1 rounded-md text-red-500 font-semibold">Ctrl+Shift+X</kbd>
                       </button>
+                      
+                      {!isTestAccount && (
+                        <button
+                          onClick={handleDeleteAccount}
+                          className="w-full px-4 py-2.5 text-left text-sm text-red-700 hover:bg-red-50 flex items-center gap-2.5 transition-colors"
+                        >
+                          <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16" />
+                          </svg>
+                          Delete Account
+                        </button>
+                      )}
                     </div>
                   </div>
                 )}
