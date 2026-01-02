@@ -21,8 +21,6 @@ export function useAuth() {
     
     fetchingRef.current = true
     lastFetchedUserIdRef.current = userId
-    const avatarFromMetadata = userMetadata?.avatar_url || userMetadata?.picture || null
-    const fallbackAvatar = generateAvatarUrl(userId)
     const usernameFromEmail = userEmail ? userEmail.split('@')[0] : 'user'
 
     try {
@@ -39,7 +37,7 @@ export function useAuth() {
           email: userEmail,
           username: usernameFromEmail,
           role: 'user',
-          avatar_url: avatarFromMetadata || fallbackAvatar,
+          avatar_url: null,
           full_name: userMetadata?.full_name || null,
           created_at: new Date().toISOString()
         }
@@ -59,7 +57,7 @@ export function useAuth() {
             email: userEmail,
             username: usernameFromEmail,
             role: 'user',
-            avatar_url: avatarFromMetadata || fallbackAvatar,
+            avatar_url: null,
             full_name: userMetadata?.full_name || null,
           })
           .select()
@@ -80,7 +78,7 @@ export function useAuth() {
               email: userEmail,
               username: usernameFromEmail,
               role: 'user',
-              avatar_url: avatarFromMetadata || fallbackAvatar,
+              avatar_url: null,
               full_name: userMetadata?.full_name || null,
               created_at: new Date().toISOString()
             }
@@ -101,38 +99,8 @@ export function useAuth() {
         throw error
       }
 
-      // If profile exists but has missing fields, heal them
-      let profileData = data
-      const hasOldExternalAvatar = data.avatar_url && (
-        data.avatar_url.includes('dicebear.com') ||
-        data.avatar_url.startsWith('http')
-      )
-
-      const needsUsername = !data.username || data.username.trim().length === 0
-      const needsAvatar = !data.avatar_url || hasOldExternalAvatar
-
-      if (needsUsername || needsAvatar) {
-        const generatedUrl = needsAvatar ? (avatarFromMetadata || fallbackAvatar) : data.avatar_url
-        const healedData = {
-          ...(needsUsername ? { username: usernameFromEmail } : {}),
-          ...(needsAvatar ? { avatar_url: generatedUrl } : {}),
-        }
-
-        profileData = { ...data, ...healedData }
-
-        // Update in background without blocking
-        supabase
-          .from('profiles')
-          .update(healedData)
-          .eq('id', userId)
-          .then(result => {
-            if (result.error) {
-              console.error('Failed to heal profile:', result.error.message)
-            }
-          })
-      }
-
-      setUserProfile(profileData)
+      // Use profile data as-is, avatar_url may be null (valid state)
+      setUserProfile(data)
     } catch (err) {
       console.error('Error fetching/creating profile:', err)
       setUserProfile(null)
