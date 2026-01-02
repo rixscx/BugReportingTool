@@ -19,6 +19,9 @@ export default function EditProfile() {
   const [showCropper, setShowCropper] = useState(false)
   const [loading, setLoading] = useState(false)
   const [error, setError] = useState(null)
+  
+  // Procedural avatar seed (UI-only, never stored in DB)
+  const [proceduralSeed, setProceduralSeed] = useState(session?.user?.id || '')
 
   // Load profile data and generate default avatar if needed
   useEffect(() => {
@@ -26,14 +29,14 @@ export default function EditProfile() {
       setUsername(userProfile.username || (session?.user?.email?.split('@')[0] || ''))
       setFullName(userProfile.full_name || '')
       
-      // Always ensure we have an avatar - use stored or generate default
-      const finalAvatar = userProfile.avatar_url || (session?.user?.id ? generateAvatarUrl(session.user.id) : '')
+      // Use uploaded avatar if exists, otherwise generate procedural from seed
+      const finalAvatar = userProfile.avatar_url || (proceduralSeed ? generateAvatarUrl(proceduralSeed) : '')
       setAvatarUrl(finalAvatar)
-    } else if (session?.user?.id) {
-      // If profile hasn't loaded yet, at least set a generated avatar
-      setAvatarUrl(generateAvatarUrl(session.user.id))
+    } else if (proceduralSeed) {
+      // If profile hasn't loaded yet, generate procedural avatar from seed
+      setAvatarUrl(generateAvatarUrl(proceduralSeed))
     }
-  }, [userProfile, session?.user?.id, session?.user?.email])
+  }, [userProfile, session?.user?.email, proceduralSeed])
 
   const handleAvatarUpload = (e) => {
     const file = e.target.files?.[0]
@@ -94,11 +97,27 @@ export default function EditProfile() {
 
   const handleRemoveAvatar = () => {
     setAvatarFile(null)
-    // Regenerate default avatar
-    if (session?.user?.id) {
-      const generatedUrl = generateAvatarUrl(session.user.id)
+    // Regenerate procedural avatar from current seed
+    if (proceduralSeed) {
+      const generatedUrl = generateAvatarUrl(proceduralSeed)
       setAvatarUrl(generatedUrl)
     }
+  }
+
+  /**
+   * Generate new procedural avatar (UI-only, never stored)
+   * Creates a new random seed and re-renders avatar
+   * Does NOT touch profiles.avatar_url
+   */
+  const handleGenerateNewAvatar = () => {
+    // Generate new seed: userId + timestamp for randomness
+    const newSeed = `${session?.user?.id}-${Date.now()}`
+    setProceduralSeed(newSeed)
+    
+    // Clear any uploaded file since user wants procedural avatar
+    setAvatarFile(null)
+    
+    // Avatar will update automatically via useEffect
   }
 
   const handleSave = async (e) => {
@@ -292,7 +311,7 @@ export default function EditProfile() {
               </div>
               
               <p className="text-xs text-slate-500 mt-3 text-center">
-                {avatarFile ? 'Custom avatar uploaded' : 'Default generated avatar'}
+                {avatarFile ? 'Custom avatar ready to save' : userProfile?.avatar_url ? 'Uploaded avatar' : 'Generated avatar (temporary)'}
               </p>
             </div>
 
@@ -310,6 +329,20 @@ export default function EditProfile() {
                   className="hidden"
                 />
               </label>
+              
+              {/* Generate new procedural avatar button (UI-only) */}
+              {!avatarFile && (
+                <button
+                  type="button"
+                  onClick={handleGenerateNewAvatar}
+                  className="w-full px-4 py-3 bg-slate-100 text-slate-700 rounded-xl font-medium hover:bg-slate-200 transition-colors flex items-center justify-center gap-2"
+                >
+                  <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M4 4v5h.582m15.356 2A8.001 8.001 0 004.582 9m0 0H9m11 11v-5h-.581m0 0a8.003 8.003 0 01-15.357-2m15.357 2H15" />
+                  </svg>
+                  Generate New Avatar
+                </button>
+              )}
               
               <p className="text-xs text-slate-500 text-center">
                 JPG or PNG only (max 2MB)
