@@ -1,4 +1,4 @@
-import { generatePixelAvatarDataURL } from './pixelAvatarGenerator'
+import { generatePixelAvatarDataURL } from './pixelAvatarGenerator.jsx'
 
 /**
  * Generate a unique pixel art avatar URL for a user
