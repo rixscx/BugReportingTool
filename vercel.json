@@ -4,5 +4,11 @@
   "installCommand": "npm ci",
   "env": {
     "VITE_BASE_PATH": "/"
-  }
+  },
+  "rewrites": [
+    {
+      "source": "/(.*)",
+      "destination": "/index.html"
+    }
+  ]
 }
