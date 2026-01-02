@@ -1,33 +1,30 @@
-import { generateAvatarDataURL } from './avatarGenerator.jsx'
+import { generatePixelAvatarDataURL } from './pixelAvatarGenerator'
 
 /**
- * Generate a unique avatar URL for a user
+ * Generate a unique pixel art avatar URL for a user
  * Uses procedural generation - same user ID always gets same avatar
- * Avatars are geometric patterns, not initials
+ * Avatars are 8-bit pixel art style, deterministically generated
  */
 export const generateAvatarUrl = (seed) => {
   if (!seed) return null
-  return generateAvatarDataURL(seed, 90)
+  return generatePixelAvatarDataURL(seed, 90, 'blocky')
 }
 
 /**
  * Get avatar styles available
  */
 export const AVATAR_STYLES = [
-  { value: 'geometric', label: 'Geometric (Default)' },
-  { value: 'blocks', label: 'Block Pattern' },
-  { value: 'dots', label: 'Dot Matrix' },
-  { value: 'waves', label: 'Wave Pattern' },
+  { value: 'blocky', label: 'Pixel Art (Default)' },
+  { value: 'rounded', label: 'Rounded Pixels' },
+  { value: 'robot', label: 'Robot Style' },
 ]
 
 /**
  * Generate avatar with custom style
- * Currently all use same algorithm, but seed is modified for variety
+ * Different pixel styles for variety
  */
-export const generateAvatarWithStyle = (seed, style = 'geometric') => {
+export const generateAvatarWithStyle = (seed, style = 'blocky') => {
   if (!seed) return null
   
-  // Add style prefix to seed to generate different patterns
-  const styledSeed = `${style}-${seed}`
-  return generateAvatarDataURL(styledSeed, 90)
+  return generatePixelAvatarDataURL(seed, 90, style)
 }
