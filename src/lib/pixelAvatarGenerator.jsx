@@ -1,5 +1,5 @@
 /**
- * Pixel Art Avatar Generator
+ * Pixel Art Avatar Generator (v2.0)
  * Generates retro 8-bit style pixel avatars deterministically
  * 
  * Features:
