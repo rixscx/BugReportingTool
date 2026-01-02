@@ -1,4 +1,4 @@
-import { useState, useEffect, useCallback } from 'react'
+import { useState, useEffect, useCallback, useRef } from 'react'
 import { supabase } from '../lib/supabaseClient'
 import { generateAvatarUrl } from '../lib/avatarUtils'
 
@@ -10,67 +10,143 @@ export function useAuth() {
   const [session, setSession] = useState(null)
   const [userProfile, setUserProfile] = useState(null)
   const [loading, setLoading] = useState(true)
+  const fetchingRef = useRef(false)
+  const lastFetchedUserIdRef = useRef(null)
 
   const fetchUserProfile = useCallback(async (userId, userEmail, userMetadata) => {
+    // Prevent duplicate fetches for the same user
+    if (fetchingRef.current || lastFetchedUserIdRef.current === userId) {
+      return
+    }
+    
+    fetchingRef.current = true
+    lastFetchedUserIdRef.current = userId
+    const avatarFromMetadata = userMetadata?.avatar_url || userMetadata?.picture || null
+    const fallbackAvatar = generateAvatarUrl(userId)
+    const usernameFromEmail = userEmail ? userEmail.split('@')[0] : 'user'
+
     try {
       const { data, error } = await supabase
         .from('profiles')
         .select('*')
         .eq('id', userId)
-        .single()
+        .maybeSingle()
 
-      if (error) {
-        // Profile doesn't exist, create one (for OAuth users)
-        if (error.code === 'PGRST116') {
-          const { data: newProfile, error: insertError } = await supabase
-            .from('profiles')
-            .insert({
+      // If we get a permission error (RLS blocking), use fallback immediately
+      if (error && (error.code === 'PGRST301' || error.message?.includes('permission'))) {
+        const fallbackProfile = {
+          id: userId,
+          email: userEmail,
+          username: usernameFromEmail,
+          role: 'user',
+          avatar_url: avatarFromMetadata || fallbackAvatar,
+          full_name: userMetadata?.full_name || null,
+          created_at: new Date().toISOString()
+        }
+        setUserProfile(fallbackProfile)
+        setLoading(false)
+        return
+      }
+
+      // Check if profile doesn't exist (null data and no error, or PGRST116)
+      const noProfile = (!data && !error) || error?.code === 'PGRST116'
+
+      if (noProfile) {
+        const { data: newProfile, error: insertError } = await supabase
+          .from('profiles')
+          .insert({
+            id: userId,
+            email: userEmail,
+            username: usernameFromEmail,
+            role: 'user',
+            avatar_url: avatarFromMetadata || fallbackAvatar,
+            full_name: userMetadata?.full_name || null,
+          })
+          .select()
+          .single()
+
+        if (insertError) {
+          // Profile exists but RLS blocks access, or foreign key error - use fallback
+          const isConflict = insertError.code === '23505' || 
+                            insertError.message?.includes('duplicate') ||
+                            insertError.message?.includes('already exists')
+          
+          const isForeignKeyError = insertError.code === '23503' ||
+                                    insertError.message?.includes('foreign key constraint')
+          
+          if (isConflict || isForeignKeyError) {
+            const fallbackProfile = {
               id: userId,
               email: userEmail,
-              username: userEmail.split('@')[0],
+              username: usernameFromEmail,
               role: 'user',
-              avatar_url: userMetadata?.avatar_url || generateAvatarUrl(userId),
+              avatar_url: avatarFromMetadata || fallbackAvatar,
               full_name: userMetadata?.full_name || null,
-            })
-            .select()
-            .single()
-
-          if (insertError) throw insertError
-          setUserProfile(newProfile)
-        } else {
-          throw error
-        }
-      } else {
-        // If profile exists but has no avatar_url OR has old DiceBear URL, generate one
-        let profileData = data
-        const hasOldExternalAvatar = data.avatar_url && (
-          data.avatar_url.includes('dicebear.com') || 
-          data.avatar_url.startsWith('http')
-        )
-        
-        if (!data.avatar_url || hasOldExternalAvatar) {
-          const generatedUrl = generateAvatarUrl(userId)
-          profileData = { ...data, avatar_url: generatedUrl }
+              created_at: new Date().toISOString()
+            }
+            setUserProfile(fallbackProfile)
+            setLoading(false)
+            return
+          }
           
-          // Update it in the background (non-critical)
-          supabase
-            .from('profiles')
-            .update({ avatar_url: generatedUrl })
-            .eq('id', userId)
-            .catch(err => console.error('Failed to save avatar URL:', err))
+          console.error('Failed to create profile:', insertError)
+          throw insertError
         }
-        setUserProfile(profileData)
+        setUserProfile(newProfile)
+        return
       }
+
+      if (error) {
+        console.error('Error fetching profile:', error)
+        throw error
+      }
+
+      // If profile exists but has missing fields, heal them
+      let profileData = data
+      const hasOldExternalAvatar = data.avatar_url && (
+        data.avatar_url.includes('dicebear.com') ||
+        data.avatar_url.startsWith('http')
+      )
+
+      const needsUsername = !data.username || data.username.trim().length === 0
+      const needsAvatar = !data.avatar_url || hasOldExternalAvatar
+
+      if (needsUsername || needsAvatar) {
+        const generatedUrl = needsAvatar ? (avatarFromMetadata || fallbackAvatar) : data.avatar_url
+        const healedData = {
+          ...(needsUsername ? { username: usernameFromEmail } : {}),
+          ...(needsAvatar ? { avatar_url: generatedUrl } : {}),
+        }
+
+        profileData = { ...data, ...healedData }
+
+        // Update in background without blocking
+        supabase
+          .from('profiles')
+          .update(healedData)
+          .eq('id', userId)
+          .then(result => {
+            if (result.error) {
+              console.error('Failed to heal profile:', result.error.message)
+            }
+          })
+      }
+
+      setUserProfile(profileData)
     } catch (err) {
       console.error('Error fetching/creating profile:', err)
       setUserProfile(null)
     } finally {
       setLoading(false)
+      fetchingRef.current = false
     }
   }, [])
 
   useEffect(() => {
+    let isMounted = true
+    
     supabase.auth.getSession().then(({ data: { session } }) => {
+      if (!isMounted) return
       setSession(session)
       if (session?.user) {
         fetchUserProfile(session.user.id, session.user.email, session.user.user_metadata)
@@ -78,8 +154,10 @@ export function useAuth() {
         setLoading(false)
       }
     })
+    
     const { data: { subscription } } = supabase.auth.onAuthStateChange(
       (_event, session) => {
+        if (!isMounted) return
         setSession(session)
         if (session?.user) {
           fetchUserProfile(session.user.id, session.user.email, session.user.user_metadata)
@@ -90,7 +168,10 @@ export function useAuth() {
       }
     )
 
-    return () => subscription.unsubscribe()
+    return () => {
+      isMounted = false
+      subscription.unsubscribe()
+    }
   }, [fetchUserProfile])
 
   const signOut = useCallback(async () => {
@@ -151,8 +232,17 @@ export function useAuth() {
     deleteAccount,
     refetchProfile: async () => {
       if (session?.user) {
+        lastFetchedUserIdRef.current = null // Allow refetch
+        fetchingRef.current = false
         await fetchUserProfile(session.user.id, session.user.email, session.user.user_metadata)
       }
+    },
+    // Update profile state directly (for fallback profiles that can't be read from DB)
+    updateProfileState: (updates) => {
+      setUserProfile(prev => ({
+        ...prev,
+        ...updates
+      }))
     }
   }
 }

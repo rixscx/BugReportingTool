@@ -8,7 +8,7 @@ import { useAuth } from '../hooks/useAuth'
 export default function EditProfile() {
   const navigate = useNavigate()
   const { showToast } = useToast()
-  const { userProfile, session, refetchProfile } = useAuth()
+  const { userProfile, session, refetchProfile, updateProfileState } = useAuth()
   
   const [username, setUsername] = useState('')
   const [fullName, setFullName] = useState('')
@@ -20,19 +20,17 @@ export default function EditProfile() {
   // Load profile data and generate default avatar if needed
   useEffect(() => {
     if (userProfile) {
-      setUsername(userProfile.username || '')
+      setUsername(userProfile.username || (session?.user?.email?.split('@')[0] || ''))
       setFullName(userProfile.full_name || '')
       
-      // Use stored avatar or generate default
-      if (userProfile.avatar_url) {
-        setAvatarUrl(userProfile.avatar_url)
-      } else if (session?.user?.id) {
-        // Generate default geometric avatar
-        const generatedUrl = generateAvatarUrl(session.user.id)
-        setAvatarUrl(generatedUrl)
-      }
+      // Always ensure we have an avatar - use stored or generate default
+      const finalAvatar = userProfile.avatar_url || (session?.user?.id ? generateAvatarUrl(session.user.id) : '')
+      setAvatarUrl(finalAvatar)
+    } else if (session?.user?.id) {
+      // If profile hasn't loaded yet, at least set a generated avatar
+      setAvatarUrl(generateAvatarUrl(session.user.id))
     }
-  }, [userProfile, session?.user?.id])
+  }, [userProfile, session?.user?.id, session?.user?.email])
 
   const handleAvatarUpload = (e) => {
     const file = e.target.files?.[0]
@@ -75,21 +73,25 @@ export default function EditProfile() {
     setError(null)
 
     try {
-      let finalAvatarUrl = avatarUrl
+      let finalAvatarUrl = avatarUrl || (session?.user?.id ? generateAvatarUrl(session.user.id) : '')
 
       // If user uploaded a new avatar, upload to Supabase Storage
       if (avatarFile) {
         const fileExt = avatarFile.name.split('.').pop()
         const fileName = `${session.user.id}-${Date.now()}.${fileExt}`
-        const filePath = `avatars/${fileName}`
+        const filePath = `${fileName}`  // Don't use avatars/ prefix, it's in bucket config
 
-        const { error: uploadError } = await supabase.storage
+        const { error: uploadError, data: uploadData } = await supabase.storage
           .from('avatars')
           .upload(filePath, avatarFile, { upsert: true })
 
         if (uploadError) {
           console.error('Upload error:', uploadError)
-          throw new Error('Failed to upload avatar')
+          // If bucket doesn't exist, show helpful message
+          if (uploadError.message?.includes('not found') || uploadError.message?.includes('does not exist')) {
+            throw new Error('Avatar storage not configured. Please create "avatars" bucket in Supabase Storage.')
+          }
+          throw new Error(`Failed to upload avatar: ${uploadError.message}`)
         }
 
         // Get public URL
@@ -100,36 +102,58 @@ export default function EditProfile() {
         finalAvatarUrl = data.publicUrl
       }
 
-      // Prepare update data
+      // Prepare update data (don't include id or email - they're immutable)
       const updateData = {
         username,
         full_name: fullName,
         avatar_url: finalAvatarUrl,
       }
 
-      const { error: updateError } = await supabase
+      const { error: updateError, data: updatedProfile } = await supabase
         .from('profiles')
         .update(updateData)
         .eq('id', session.user.id)
+        .select()
 
       if (updateError) {
-        console.error('Update error:', updateError)
-        
-        if (updateError.message?.includes('could not find')) {
+        // If update fails due to RLS or missing row, try upsert as fallback
+        if (updateError.code === 'PGRST116' || updateError.message?.includes('0 rows')) {
+          const { error: upsertError } = await supabase
+            .from('profiles')
+            .upsert({
+              id: session.user.id,
+              email: session.user.email,
+              ...updateData,
+            }, { onConflict: 'id' })
+          
+          if (upsertError) {
+            console.error('Upsert also failed:', upsertError)
+            showToast('Could not save to database. Please contact support.', 'error')
+            setLoading(false)
+            return
+          }
+        } else if (updateError.message?.includes('could not find')) {
           throw new Error('Database schema issue. Please contact support.')
+        } else {
+          throw updateError
         }
-        throw updateError
       }
 
       showToast('Profile updated successfully!', 'success')
       
-      // Refetch profile to update navbar and UI
-      if (refetchProfile) {
-        await refetchProfile()
+      // Update the profile state immediately with new values (works for all users - test and fallback)
+      if (updateProfileState) {
+        updateProfileState({
+          username,
+          full_name: fullName,
+          avatar_url: finalAvatarUrl,
+        })
       }
       
       // Force a full page navigation to ensure all components refresh with new data
-      window.location.href = '/'
+      setTimeout(() => {
+        window.location.href = '/'
+      }, 500)
     } catch (err) {
       const errorMsg = err.message || 'Failed to update profile'
       setError(errorMsg)
