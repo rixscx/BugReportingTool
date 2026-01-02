@@ -485,7 +485,7 @@ We welcome contributions from the community! Here's how you can help:
 
 2. **Clone your fork**
    ```bash
-   git clone https://github.com/YOUR_USERNAME/BugReportingTool.git
+   git clone https://github.com/rixscx/BugReportingTool.git
    cd BugReportingTool
    ```
 
