@@ -31,7 +31,7 @@ export default function Navbar({ session, userProfile, isAdmin }) {
     setShowUserMenu(false)
     try {
       await supabase.auth.signOut()
-      window.location.href = '/auth'
+      window.location.href = '/'
     } catch {
     }
   }, [])
