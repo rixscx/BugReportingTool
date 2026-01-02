@@ -32,8 +32,8 @@ export function useAuth() {
         .eq('id', userId)
         .maybeSingle()
 
-      // If we get a permission error (RLS blocking), use fallback immediately
-      if (error && (error.code === 'PGRST301' || error.message?.includes('permission'))) {
+      // If we get a permission error (RLS blocking) or 409 conflict, use fallback immediately
+      if (error && (error.code === 'PGRST301' || error.code === '409' || error.message?.includes('permission'))) {
         const fallbackProfile = {
           id: userId,
           email: userEmail,

@@ -115,9 +115,13 @@ export default function EditProfile() {
         .eq('id', session.user.id)
         .select()
 
+      let dbUpdateSucceeded = !updateError
+
       if (updateError) {
-        // If update fails due to RLS or missing row, try upsert as fallback
-        if (updateError.code === 'PGRST116' || updateError.message?.includes('0 rows')) {
+        console.warn('Update error:', updateError.code, updateError.message)
+        // If update fails due to RLS (409, PGRST301), missing row, or 0 rows, try upsert as fallback
+        if (updateError.code === 'PGRST116' || updateError.code === '409' || updateError.code === 'PGRST301' || updateError.message?.includes('0 rows') || updateError.message?.includes('permission')) {
+          console.log('Attempting upsert fallback...')
           const { error: upsertError } = await supabase
             .from('profiles')
             .upsert({
@@ -127,19 +131,27 @@ export default function EditProfile() {
             }, { onConflict: 'id' })
           
           if (upsertError) {
-            console.error('Upsert also failed:', upsertError)
+            console.error('Upsert also failed:', upsertError.code, upsertError.message)
             showToast('Could not save to database. Please contact support.', 'error')
             setLoading(false)
             return
           }
+          console.log('Upsert succeeded')
+          dbUpdateSucceeded = true
         } else if (updateError.message?.includes('could not find')) {
           throw new Error('Database schema issue. Please contact support.')
         } else {
+          console.error('Unexpected update error:', updateError)
           throw updateError
         }
+      } else {
+        console.log('Update succeeded')
       }
 
-      showToast('Profile updated successfully!', 'success')
+      // Only show success if database update actually worked
+      if (dbUpdateSucceeded) {
+        showToast('Profile updated successfully!', 'success')
+      }
       
       // Update the profile state immediately with new values (works for all users - test and fallback)
       if (updateProfileState) {
