@@ -1,6 +1,7 @@
 import { useState, useEffect, useCallback } from 'react'
 import { useParams, useNavigate } from 'react-router-dom'
 import { supabase } from '../lib/supabaseClient'
+import { deleteBugImage } from '../lib/bugImageStorage'
 import { useKeyboardShortcut } from '../hooks/useKeyboardShortcut'
 import { SHORTCUT_KEYS } from '../lib/constants'
 import { BugDetailSkeleton } from '../components/Skeleton'
@@ -180,6 +181,7 @@ export default function BugDetail({ session, isAdmin }) {
     }
   }
 
+  // STORAGE LIFECYCLE: Delete bug with image cleanup
   const deleteBug = async () => {
     const confirmed = await deleteDialog.confirm({
       title: 'Delete Bug Permanently',
@@ -194,12 +196,31 @@ export default function BugDetail({ session, isAdmin }) {
     setError(null)
     
     try {
+      // DB/RLS AUDIT: Delete bug from database first
       const { error: deleteError } = await supabase
         .from('bugs')
         .delete()
         .eq('id', id)
 
-      if (deleteError) throw deleteError
+      if (deleteError) {
+        // DB/RLS AUDIT: Fail loudly on delete errors
+        console.error('❌ DB/RLS AUDIT: Bug delete failed:', {
+          bugId: id,
+          code: deleteError.code,
+          message: deleteError.message
+        })
+        throw deleteError
+      }
+      
+      // STORAGE LIFECYCLE: Clean up bug image AFTER successful DB delete
+      if (bug?.image_url) {
+        const cleanupResult = await deleteBugImage(bug.image_url)
+        if (!cleanupResult.success) {
+          // Log but don't fail - bug is already deleted
+          console.error('⚠️ STORAGE LIFECYCLE: Bug image cleanup failed (non-fatal):', cleanupResult.error)
+        }
+      }
+      
       showToast('Bug deleted permanently', 'success')
       navigate('/')
     } catch {

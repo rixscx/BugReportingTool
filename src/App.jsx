@@ -7,6 +7,7 @@ import { PageLoader } from './components/Skeleton'
 import { KeyboardShortcutsHelp } from './components/KeyboardShortcutsHelp'
 import { QuickActions } from './components/QuickActions'
 import { initWatermark } from './lib/watermark'
+import ErrorBoundary from './components/ErrorBoundary' // PHASE 3 — ERROR BOUNDARY
 import Auth from './components/Auth'
 import Navbar from './components/Navbar'
 
@@ -78,11 +79,13 @@ function AppContent() {
 
 function App() {
   return (
-    <BrowserRouter basename={import.meta.env.BASE_URL}>
-      <ToastProvider>
-        <AppContent />
-      </ToastProvider>
-    </BrowserRouter>
+    <ErrorBoundary>
+      <BrowserRouter basename={import.meta.env.BASE_URL}>
+        <ToastProvider>
+          <AppContent />
+        </ToastProvider>
+      </BrowserRouter>
+    </ErrorBoundary>
   )
 }
 

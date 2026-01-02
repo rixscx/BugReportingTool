@@ -1,6 +1,7 @@
 import { useState, useRef, useEffect } from 'react'
 import { useNavigate } from 'react-router-dom'
 import { supabase } from '../lib/supabaseClient'
+import { uploadBugImage } from '../lib/bugImageStorage' // PHASE 3 FIX: Isolated bug image storage
 import { useKeyboardShortcut } from '../hooks/useKeyboardShortcut'
 import { useBugs } from '../hooks/useBugs'
 import { useAuth } from '../hooks/useAuth'
@@ -15,6 +16,7 @@ export default function CreateBug({ session }) {
   const { bugs: existingBugs } = useBugs({ includeArchived: false })
   const titleInputRef = useRef(null)
   const [loading, setLoading] = useState(false)
+  const [submitting, setSubmitting] = useState(false) // PHASE 1 — ATOMIC BUG SUBMISSION: Prevent double submission
   const [error, setError] = useState(null)
   const [selectedLabels, setSelectedLabels] = useState([])
   const [formData, setFormData] = useState({
@@ -138,59 +140,54 @@ export default function CreateBug({ session }) {
   }
 
   /**
-   * Upload bug screenshot to "Bug images" bucket
-   * Path: {sanitized_bug_title}-{reported_by}.png
-   * Where reported_by = full_name || username || 'unknown'
+   * PHASE 1 — ATOMIC BUG SUBMISSION
+   * 
+   * INVARIANTS:
+   * 1. If image upload fails → bug is NOT created (no orphan DB rows)
+   * 2. If bug insert fails → submission fails loudly (no silent errors)
+   * 3. image_url is ALWAYS string or null (never undefined/empty)
+   * 4. Form state only resets after FULL success
+   * 5. Double submission is prevented via submitting state
    */
-  const uploadImage = async () => {
-    if (!imageFile) return null
-    
-    // Get reporter name from profile: full_name > username > email prefix
-    const reportedBy = userProfile?.full_name || 
-                       userProfile?.username || 
-                       session?.user?.email?.split('@')[0] || 
-                       'unknown'
-    
-    // Sanitize bug title for filename (remove special chars, limit length)
-    const sanitizedTitle = formData.title
-      .toLowerCase()
-      .replace(/[^a-z0-9]+/g, '-')
-      .replace(/^-+|-+$/g, '')
-      .substring(0, 50)
-    
-    // Sanitize reporter name
-    const sanitizedReporter = reportedBy
-      .toLowerCase()
-      .replace(/[^a-z0-9]+/g, '-')
-      .replace(/^-+|-+$/g, '')
-    
-    // Build filename: {bug_title}-{reported_by}.png
-    const fileName = `${sanitizedTitle}-${sanitizedReporter}.png`
-    
-    // Upload to "Bug images" bucket ONLY
-    const { error: uploadError } = await supabase.storage
-      .from('Bug images')
-      .upload(fileName, imageFile, { upsert: true })
-    
-    if (uploadError) throw uploadError
-    
-    // Get public URL from "Bug images" bucket
-    const { data } = supabase.storage
-      .from('Bug images')
-      .getPublicUrl(fileName)
-    
-    return data.publicUrl
-  }
-
   const handleSubmit = async (e) => {
     e.preventDefault()
+    
+    // PHASE 1: Prevent double submission
+    if (submitting) {
+      console.warn('⚠️ PHASE 1: Submission already in progress, ignoring duplicate')
+      return
+    }
+    
+    setSubmitting(true)
     setLoading(true)
     setError(null)
 
-    try {
-      let imageUrl = null
-      if (imageFile) imageUrl = await uploadImage()
+    // PHASE 1: Declare imageUrl outside try block for proper scoping
+    let imageUrl = null
 
+    try {
+      // PHASE 1 — STEP 1: Upload image FIRST (if present)
+      // If this fails, we abort BEFORE creating any DB row
+      if (imageFile) {
+        // Validate userProfile exists before attempting upload
+        if (!userProfile) {
+          throw new Error('User profile not loaded. Please refresh and try again.')
+        }
+        
+        // Upload image - if this throws, no bug row is created
+        imageUrl = await uploadBugImage(imageFile, formData.title, {
+          full_name: userProfile.full_name,
+          username: userProfile.username,
+          email: session?.user?.email
+        })
+        
+        // PHASE 1: Validate imageUrl is a valid string
+        if (typeof imageUrl !== 'string' || imageUrl.trim().length === 0) {
+          throw new Error('Image upload returned invalid URL')
+        }
+      }
+
+      // PHASE 1 — STEP 2: Build full description
       let fullDescription = formData.description
       if (formData.expected_behavior || formData.actual_behavior) {
         fullDescription += '\n\n---'
@@ -201,24 +198,51 @@ export default function CreateBug({ session }) {
         fullDescription += `\n\n**Environment:** ${formData.browser} / ${formData.os}${formData.version ? ` / v${formData.version}` : ''}`
       }
 
+      // PHASE 1 — STEP 3: Insert bug ONLY after successful image upload
+      // image_url is normalized to null if not set (never undefined)
       const { error: insertError } = await supabase.from('bugs').insert({
         title: formData.title,
         description: fullDescription,
         steps_to_reproduce: formData.steps_to_reproduce,
         priority: formData.priority,
         status: 'Open',
-        image_url: imageUrl,
+        image_url: imageUrl ?? null, // PHASE 1: ALWAYS string or null
         reported_by: session.user.id,
       })
 
-      if (insertError) throw insertError
+      // PHASE 1: Fail loudly on database errors
+      if (insertError) {
+        console.error('❌ PHASE 1: Bug insert failed:', {
+          code: insertError.code,
+          message: insertError.message,
+          details: insertError.details,
+          hint: insertError.hint
+        })
+        throw new Error(`Database error: ${insertError.message}`)
+      }
+      
+      // PHASE 1 — SUCCESS: Only show success and navigate after FULL completion
       showToast('Bug report submitted!', 'success')
       navigate('/')
+      
     } catch (err) {
-      setError(err.message)
-      showToast('Failed to submit bug report', 'error')
+      // PHASE 1: Log ALL errors with full context
+      console.error('❌ PHASE 1 — ATOMIC BUG SUBMISSION FAILED:', {
+        error: err,
+        message: err.message,
+        imageWasUploaded: imageUrl !== null,
+        formTitle: formData.title
+      })
+      
+      // Surface error to user
+      const errorMessage = err.message || 'Failed to submit bug report. Please try again.'
+      setError(errorMessage)
+      showToast(errorMessage, 'error')
+      
     } finally {
+      // PHASE 1: Always clear loading states in finally block
       setLoading(false)
+      setSubmitting(false)
     }
   }
 
@@ -612,16 +636,16 @@ export default function CreateBug({ session }) {
           </button>
           <button
             type="submit"
-            disabled={loading || !formData.title || !formData.description}
+            disabled={loading || submitting || !formData.title || !formData.description}
             className="px-6 py-2.5 bg-blue-600 text-white rounded-lg font-medium hover:bg-blue-700 disabled:opacity-50 disabled:cursor-not-allowed transition-all flex items-center gap-2"
           >
-            {loading && (
+            {(loading || submitting) && (
                 <svg className="animate-spin h-4 w-4" fill="none" viewBox="0 0 24 24">
                   <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4" />
                   <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z" />
                 </svg>
               )}
-              {loading ? 'Submitting...' : 'Submit Report'}
+              {(loading || submitting) ? 'Submitting...' : 'Submit Report'}
             </button>
           </div>
         </form>

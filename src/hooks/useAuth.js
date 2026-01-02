@@ -17,7 +17,13 @@ export function useAuth() {
   const [proceduralAvatarSeed, setProceduralAvatarSeed] = useState(null)
 
   const fetchUserProfile = useCallback(async (userId, userEmail, userMetadata) => {
-    // Prevent duplicate fetches for the same user
+    // PHASE 3 — OAUTH FIX: Guard against undefined/null userId before any DB queries
+    if (!userId || typeof userId !== 'string') {
+      console.error('❌ PHASE 3 — OAUTH FIX: Invalid userId provided to fetchUserProfile:', { userId, userEmail })
+      return
+    }
+    
+    // PHASE 3 — PERF POLISH: Prevent duplicate fetches for the same user
     if (fetchingRef.current || lastFetchedUserIdRef.current === userId) {
       return
     }
@@ -27,32 +33,35 @@ export function useAuth() {
     const usernameFromEmail = userEmail ? userEmail.split('@')[0] : 'user'
 
     try {
+      // PHASE 3 — OAUTH FIX: Ensure userId is valid before query
       const { data, error } = await supabase
         .from('profiles')
         .select('*')
         .eq('id', userId)
         .maybeSingle()
 
-      // If we get a permission error (RLS blocking) or 409 conflict, use fallback immediately
+      // PHASE 3 — OAUTH FIX: Log full error details for debugging
       if (error && (error.code === 'PGRST301' || error.code === '409' || error.message?.includes('permission'))) {
-        const fallbackProfile = {
-          id: userId,
-          email: userEmail,
-          username: usernameFromEmail,
-          role: 'user',
-          avatar_url: null,
-          full_name: userMetadata?.full_name || null,
-          created_at: new Date().toISOString()
-        }
-        setUserProfile(fallbackProfile)
-        setLoading(false)
-        return
+        console.error('❌ PHASE 3 — OAUTH FIX: RLS/Permission error fetching profile:', {
+          code: error.code,
+          message: error.message,
+          details: error.details,
+          hint: error.hint,
+          userId,
+          userEmail
+        })
+        throw new Error(`Database access denied. Please contact support. (${error.code})`)
       }
 
-      // Check if profile doesn't exist (null data and no error, or PGRST116)
+      // INVARIANT ENFORCED: Profile must exist in database OR be creatable
+      // Frontend MUST NEVER fabricate profile data
       const noProfile = (!data && !error) || error?.code === 'PGRST116'
 
       if (noProfile) {
+        // PHASE 3 — OAUTH FIX: Profile doesn't exist - create for OAuth/new users
+        // This handles both email/password signup AND OAuth (Google) login
+        console.log('📝 PHASE 3 — OAUTH FIX: Creating profile for user:', { userId, userEmail, provider: userMetadata?.iss })
+        
         const { data: newProfile, error: insertError } = await supabase
           .from('profiles')
           .insert({
@@ -60,53 +69,79 @@ export function useAuth() {
             email: userEmail,
             username: usernameFromEmail,
             role: 'user',
-            avatar_url: null,
+            avatar_url: null, // INVARIANT: avatar_url must be null, never procedural
             full_name: userMetadata?.full_name || null,
           })
           .select()
           .single()
 
         if (insertError) {
-          // Profile exists but RLS blocks access, or foreign key error - use fallback
-          const isConflict = insertError.code === '23505' || 
-                            insertError.message?.includes('duplicate') ||
-                            insertError.message?.includes('already exists')
+          // PHASE 3 — OAUTH FIX: Handle duplicate key errors gracefully for OAuth
+          const isDuplicate = insertError.code === '23505' || insertError.message?.includes('duplicate')
           
-          const isForeignKeyError = insertError.code === '23503' ||
-                                    insertError.message?.includes('foreign key constraint')
-          
-          if (isConflict || isForeignKeyError) {
-            const fallbackProfile = {
-              id: userId,
-              email: userEmail,
-              username: usernameFromEmail,
-              role: 'user',
-              avatar_url: null,
-              full_name: userMetadata?.full_name || null,
-              created_at: new Date().toISOString()
+          if (isDuplicate) {
+            // Profile was created by another tab/session - refetch it
+            console.warn('⚠️ PHASE 3 — OAUTH FIX: Profile exists (race condition), refetching...', { userId })
+            const { data: existingProfile, error: refetchError } = await supabase
+              .from('profiles')
+              .select('*')
+              .eq('id', userId)
+              .maybeSingle()
+            
+            if (refetchError || !existingProfile) {
+              console.error('❌ PHASE 3 — OAUTH FIX: Failed to refetch profile after race:', refetchError)
+              throw new Error('Profile creation race condition - please refresh')
             }
-            setUserProfile(fallbackProfile)
-            setLoading(false)
+            
+            setUserProfile(existingProfile)
             return
           }
           
-          console.error('Failed to create profile:', insertError)
-          throw insertError
+          // INVARIANT ENFORCED: Profile insert failed - DO NOT fabricate fallback
+          console.error('❌ PHASE 3 — OAUTH FIX: Profile insert failed:', {
+            code: insertError.code,
+            message: insertError.message,
+            details: insertError.details,
+            hint: insertError.hint,
+            userId,
+            userEmail
+          })
+          throw new Error(`INVARIANT VIOLATION: Failed to create profile. ${insertError.message} (${insertError.code})`)
         }
+        
+        // INVARIANT ENFORCED: Profile MUST come from database
+        if (!newProfile || !newProfile.id) {
+          throw new Error('INVARIANT VIOLATION: profiles row missing after insert. Frontend must not fabricate profiles.')
+        }
+        
         setUserProfile(newProfile)
         return
       }
 
       if (error) {
-        console.error('Error fetching profile:', error)
+        // DB/RLS AUDIT: All profile fetch errors must fail loudly
+        console.error('❌ DB/RLS AUDIT: Error fetching profile:', {
+          code: error.code,
+          message: error.message,
+          userId
+        })
         throw error
       }
+      
+      // INVARIANT ENFORCED: Profile data must exist and come from database
+      if (!data || !data.id) {
+        throw new Error('INVARIANT VIOLATION: profiles row missing. Frontend must not fabricate profiles.')
+      }
 
-      // Use profile data as-is, avatar_url may be null (valid state)
+      // Use profile data as-is from database, avatar_url may be null (valid state)
+      // Profiles must ONLY come from database.
       setUserProfile(data)
     } catch (err) {
-      console.error('Error fetching/creating profile:', err)
+      // PHASE 2 FIX: Fatal errors should surface to user - no silent fallback
+      console.error('❌ PHASE 2: Fatal profile error:', err)
       setUserProfile(null)
+      // Re-throw to propagate error to auth state
+      throw err
     } finally {
       setLoading(false)
       fetchingRef.current = false
@@ -116,28 +151,64 @@ export function useAuth() {
   useEffect(() => {
     let isMounted = true
     
-    supabase.auth.getSession().then(({ data: { session } }) => {
+    // PHASE 3 — AUTH RACE FIX: Get initial session and wait for it to be stable
+    supabase.auth.getSession().then(({ data: { session }, error }) => {
       if (!isMounted) return
+      
+      // PHASE 3 — OAUTH FIX: Log any session retrieval errors
+      if (error) {
+        console.error('❌ PHASE 3 — OAUTH FIX: Failed to get session:', error)
+        setLoading(false)
+        return
+      }
+      
       setSession(session)
-      if (session?.user) {
-        // Set initial procedural avatar seed to userId
+      
+      if (session?.user?.id) {
+        // PHASE 3 — OAUTH FIX: Validate session has required fields before profile fetch
+        if (!session.user.email) {
+          console.warn('⚠️ PHASE 3 — OAUTH FIX: Session missing email, using id as fallback')
+        }
+        
+        // PHASE 2 — PROCEDURAL AVATAR FIX: Set initial seed to userId on login
         setProceduralAvatarSeed(session.user.id)
+        
+        // PHASE 3 — AUTH RACE FIX: Fetch profile only after session is confirmed stable
         fetchUserProfile(session.user.id, session.user.email, session.user.user_metadata)
       } else {
         setLoading(false)
       }
     })
     
+    // PHASE 3 — AUTH RACE FIX: Listen for auth state changes (login/logout/refresh)
     const { data: { subscription } } = supabase.auth.onAuthStateChange(
-      (_event, session) => {
+      (event, session) => {
         if (!isMounted) return
+        
+        // PHASE 3 — OAUTH FIX: Log auth events for debugging
+        console.log(`🔐 PHASE 3 — OAUTH FIX: Auth event: ${event}`, { hasSession: !!session, userId: session?.user?.id })
+        
         setSession(session)
-        if (session?.user) {
-          // Reset seed to userId on auth change
+        
+        if (session?.user?.id) {
+          // PHASE 3 — AUTH RACE FIX: Validate session before processing
+          if (!session.user.email && event !== 'TOKEN_REFRESHED') {
+            console.warn('⚠️ PHASE 3 — OAUTH FIX: Session missing email on event:', event)
+          }
+          
+          // PHASE 2 — PROCEDURAL AVATAR FIX: Reset seed to userId on auth change
           setProceduralAvatarSeed(session.user.id)
-          fetchUserProfile(session.user.id, session.user.email, session.user.user_metadata)
+          
+          // PHASE 3 — PERF POLISH: Only fetch profile on SIGNED_IN or INITIAL_SESSION
+          // Skip fetch on TOKEN_REFRESHED if we already have the profile
+          if (event === 'SIGNED_IN' || event === 'INITIAL_SESSION' || !userProfile) {
+            fetchUserProfile(session.user.id, session.user.email, session.user.user_metadata)
+          }
         } else {
+          // PHASE 2 — PROCEDURAL AVATAR FIX: Clear seed on logout to prevent leakage
           setUserProfile(null)
+          setProceduralAvatarSeed(null)
+          lastFetchedUserIdRef.current = null // PHASE 3 — AUTH RACE FIX: Clear fetch tracking
           setLoading(false)
         }
       }
@@ -149,7 +220,13 @@ export function useAuth() {
     }
   }, [fetchUserProfile])
 
+  // AUTH HARDENING: Clear all state on logout
   const signOut = useCallback(async () => {
+    // Clear profile state BEFORE signout to prevent stale data
+    setUserProfile(null)
+    setProceduralAvatarSeed(null)
+    lastFetchedUserIdRef.current = null
+    fetchingRef.current = false
     await supabase.auth.signOut()
   }, [])
 
@@ -213,13 +290,7 @@ export function useAuth() {
         fetchingRef.current = false
         await fetchUserProfile(session.user.id, session.user.email, session.user.user_metadata)
       }
-    },
-    // Update profile state directly (for fallback profiles that can't be read from DB)
-    updateProfileState: (updates) => {
-      setUserProfile(prev => ({
-        ...prev,
-        ...updates
-      }))
     }
+    // PHASE 2 FIX: Removed updateProfileState - profiles must come from DB only
   }
 }

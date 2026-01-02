@@ -1,5 +1,6 @@
 import { useState, useEffect, useCallback } from 'react'
 import { supabase } from '../lib/supabaseClient'
+import { deleteBugImage } from '../lib/bugImageStorage'
 
 /**
  * Custom hook for fetching and managing bugs
@@ -191,17 +192,37 @@ export function useBugMutations() {
     }
   }, [])
 
-  const deleteBug = useCallback(async (bugId) => {
+  // STORAGE LIFECYCLE: Delete bug with associated image cleanup
+  const deleteBug = useCallback(async (bugId, imageUrl = null) => {
     setLoading(true)
     setError(null)
 
     try {
+      // DB/RLS AUDIT: Delete bug from database first
       const { error: deleteError } = await supabase
         .from('bugs')
         .delete()
         .eq('id', bugId)
 
-      if (deleteError) throw deleteError
+      if (deleteError) {
+        // DB/RLS AUDIT: Fail loudly on delete errors
+        console.error('❌ DB/RLS AUDIT: Bug delete failed:', {
+          bugId,
+          code: deleteError.code,
+          message: deleteError.message
+        })
+        throw deleteError
+      }
+      
+      // STORAGE LIFECYCLE: Clean up bug image AFTER successful DB delete
+      if (imageUrl) {
+        const cleanupResult = await deleteBugImage(imageUrl)
+        if (!cleanupResult.success) {
+          // Log but don't fail - bug is already deleted
+          console.error('⚠️ STORAGE LIFECYCLE: Bug image cleanup failed (non-fatal):', cleanupResult.error)
+        }
+      }
+      
       return { success: true }
     } catch (err) {
       setError(err.message)

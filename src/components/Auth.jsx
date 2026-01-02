@@ -114,12 +114,14 @@ export default function Auth() {
         }
 
         if (data.user) {
+          // GUARDRAIL #1: NEVER persist procedural avatar to database
+          // avatar_url must be null for new signups - procedural is view-only
           const { error: profileError } = await supabase.from('profiles').upsert({
             id: data.user.id,
             email: data.user.email,
             username: email.split('@')[0],
             role: isAdminSignUp ? 'admin' : 'user',
-            avatar_url: generateAvatarUrl(data.user.id),
+            avatar_url: null,  // VERIFIED: procedural avatar NOT persisted
           }, { onConflict: 'id' })
 
           if (profileError) {

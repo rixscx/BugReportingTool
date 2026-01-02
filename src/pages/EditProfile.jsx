@@ -1,4 +1,4 @@
-import { useState, useEffect } from 'react'
+import { useState, useEffect, useMemo } from 'react'
 import { useNavigate } from 'react-router-dom'
 import { supabase } from '../lib/supabaseClient'
 import { generateAvatarUrl } from '../lib/avatarUtils'
@@ -9,7 +9,8 @@ import { AvatarCropper } from '../components/AvatarCropper'
 export default function EditProfile() {
   const navigate = useNavigate()
   const { showToast } = useToast()
-  const { userProfile, session, refetchProfile, updateProfileState, proceduralAvatarSeed, setProceduralAvatarSeed } = useAuth()
+  // PHASE 2 — PROCEDURAL AVATAR FIX: Get seed from single source of truth (useAuth)
+  const { userProfile, session, refetchProfile, proceduralAvatarSeed, setProceduralAvatarSeed, loading: profileLoading } = useAuth()
   
   const [username, setUsername] = useState('')
   const [fullName, setFullName] = useState('')
@@ -19,21 +20,33 @@ export default function EditProfile() {
   const [showCropper, setShowCropper] = useState(false)
   const [loading, setLoading] = useState(false)
   const [error, setError] = useState(null)
+  
+  // PHASE 2 — PROCEDURAL AVATAR FIX: Memoize procedural avatar with [proceduralAvatarSeed] dependency
+  // This ensures avatar updates instantly when "Generate New Avatar" is clicked
+  const proceduralAvatarUrl = useMemo(() => {
+    if (!proceduralAvatarSeed) return null
+    return generateAvatarUrl(proceduralAvatarSeed)
+  }, [proceduralAvatarSeed])
 
-  // Load profile data and generate default avatar if needed
+  // PHASE 2 — PROCEDURAL AVATAR FIX: Load profile data with render gating
   useEffect(() => {
+    // Wait for profile to load before setting avatar
+    if (profileLoading) return
+    
     if (userProfile) {
       setUsername(userProfile.username || (session?.user?.email?.split('@')[0] || ''))
       setFullName(userProfile.full_name || '')
       
-      // Use uploaded avatar if exists, otherwise generate procedural from shared seed
-      const finalAvatar = userProfile.avatar_url || (proceduralAvatarSeed ? generateAvatarUrl(proceduralAvatarSeed) : '')
-      setAvatarUrl(finalAvatar)
-    } else if (proceduralAvatarSeed) {
-      // If profile hasn't loaded yet, generate procedural avatar from shared seed
-      setAvatarUrl(generateAvatarUrl(proceduralAvatarSeed))
+      // PHASE 2: Use uploaded avatar if exists, otherwise use memoized procedural
+      // Only set avatar if no custom file is being uploaded
+      if (!avatarFile) {
+        setAvatarUrl(userProfile.avatar_url || proceduralAvatarUrl || '')
+      }
+    } else if (proceduralAvatarUrl && !avatarFile) {
+      // If profile hasn't loaded yet, use memoized procedural avatar
+      setAvatarUrl(proceduralAvatarUrl)
     }
-  }, [userProfile, session?.user?.email, proceduralAvatarSeed])
+  }, [userProfile, session?.user?.email, proceduralAvatarUrl, profileLoading, avatarFile])
 
   const handleAvatarUpload = (e) => {
     const file = e.target.files?.[0]
@@ -94,27 +107,35 @@ export default function EditProfile() {
 
   const handleRemoveAvatar = () => {
     setAvatarFile(null)
-    // Regenerate procedural avatar from shared seed
-    if (proceduralAvatarSeed) {
-      const generatedUrl = generateAvatarUrl(proceduralAvatarSeed)
-      setAvatarUrl(generatedUrl)
+    // PHASE 2 — PROCEDURAL AVATAR FIX: Use memoized procedural avatar
+    if (proceduralAvatarUrl) {
+      setAvatarUrl(proceduralAvatarUrl)
     }
   }
 
   /**
-   * Generate new procedural avatar (UI-only, never stored)
-   * Creates a new random seed and updates shared state
-   * Does NOT touch profiles.avatar_url
+   * PHASE 2 — PROCEDURAL AVATAR FIX: Generate new procedural avatar
+   * - Creates new seed: userId + timestamp for randomness
+   * - Updates shared state via setProceduralAvatarSeed
+   * - Avatar updates instantly via memoized proceduralAvatarUrl
+   * - NEVER persisted to database
    */
   const handleGenerateNewAvatar = () => {
+    if (!session?.user?.id) return
+    
     // Generate new seed: userId + timestamp for randomness
-    const newSeed = `${session?.user?.id}-${Date.now()}`
+    const newSeed = `${session.user.id}-${Date.now()}`
+    
+    // Update shared seed - this triggers useMemo recalculation
     setProceduralAvatarSeed(newSeed)
     
     // Clear any uploaded file since user wants procedural avatar
     setAvatarFile(null)
     
-    // Avatar will update automatically via useEffect
+    // Immediately update local avatar state with new procedural avatar
+    // This ensures instant UI update without waiting for useEffect
+    const newAvatarUrl = generateAvatarUrl(newSeed)
+    setAvatarUrl(newAvatarUrl)
   }
 
   const handleSave = async (e) => {
@@ -123,7 +144,9 @@ export default function EditProfile() {
     setError(null)
 
     try {
-      let finalAvatarUrl = avatarUrl || (session?.user?.id ? generateAvatarUrl(session.user.id) : '')
+      // PHASE 2 — PROCEDURAL AVATAR FIX: Use memoized procedural avatar as fallback
+      // Note: procedural avatars are NEVER saved to database
+      let finalAvatarUrl = avatarUrl || proceduralAvatarUrl || ''
 
       // If user uploaded a new avatar, upload to Supabase Storage
       if (avatarFile) {
@@ -212,14 +235,9 @@ export default function EditProfile() {
         showToast('Profile updated successfully!', 'success')
       }
       
-      // Update the profile state immediately with new values (works for all users - test and fallback)
-      if (updateProfileState) {
-        updateProfileState({
-          username,
-          full_name: fullName,
-          avatar_url: finalAvatarUrl,
-        })
-      }
+      // PHASE 2 FIX: Removed updateProfileState - let DB be single source of truth
+      // Refetch profile from database to ensure consistency
+      await refetchProfile()
       
       // Force a full page navigation to ensure all components refresh with new data
       setTimeout(() => {
