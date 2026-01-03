@@ -207,7 +207,7 @@ export default function CreateBug({ session }) {
         priority: formData.priority,
         status: 'Open',
         image_url: imageUrl ?? null, // PHASE 1: ALWAYS string or null
-        reported_by: session.user.id,
+        user_id: session.user.id, // RLS: user_id matches auth.uid()
       })
 
       // PHASE 1: Fail loudly on database errors

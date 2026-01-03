@@ -98,18 +98,19 @@ export async function uploadBugImage(imageFile, bugTitle, reporter) {
     throw new Error(`Failed to upload bug image: ${uploadError.message}`)
   }
   
-  // STORAGE ISOLATION INVARIANT: Get public URL from hardcoded bucket
-  const { data } = supabase.storage
-    .from(BUG_IMAGES_BUCKET) // INVARIANT: Uses constant
-    .getPublicUrl(fileName)
+  // STORAGE COMPLIANCE: Use signed URL for PRIVATE bucket (valid for 1 year)
+  const { data, error: urlError } = await supabase.storage
+    .from(BUG_IMAGES_BUCKET)
+    .createSignedUrl(fileName, 31536000) // 1 year in seconds
   
-  if (!data || !data.publicUrl) {
+  if (urlError || !data || !data.signedUrl) {
     // DB/RLS AUDIT: Fail loudly if URL generation fails
-    console.error('❌ STORAGE: Failed to generate public URL for bug image:', {
+    console.error('❌ STORAGE: Failed to generate signed URL for bug image:', {
       bucket: BUG_IMAGES_BUCKET,
-      fileName
+      fileName,
+      error: urlError
     })
-    throw new Error('Failed to generate public URL for uploaded bug image')
+    throw new Error('Failed to generate signed URL for uploaded bug image')
   }
   
   // PERF POLISH: Remove noisy success log in production
@@ -117,7 +118,7 @@ export async function uploadBugImage(imageFile, bugTitle, reporter) {
     console.log('✅ Bug image uploaded:', fileName)
   }
   
-  return data.publicUrl
+  return data.signedUrl
 }
 
 /**

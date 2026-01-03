@@ -21,8 +21,7 @@ export function useBugs(options = {}) {
         .from('bugs')
         .select(`
           *,
-          reporter:profiles!reported_by(username, email),
-          assignee:profiles!assigned_to(username, email)
+          reporter:profiles!user_id(username)
         `)
         .order('created_at', { ascending: false })
 
@@ -71,8 +70,7 @@ export function useBug(bugId) {
         .from('bugs')
         .select(`
           *,
-          reporter:profiles!reported_by(username, email),
-          assignee:profiles!assigned_to(username, email)
+          reporter:profiles!user_id(username)
         `)
         .eq('id', bugId)
         .single()
@@ -131,25 +129,11 @@ export function useBugMutations() {
     }
   }, [])
 
+  // SCHEMA COMPLIANCE: assigned_to field does not exist in authoritative schema
+  // Only user_id (owner) exists. Assignment feature disabled.
   const updateAssignee = useCallback(async (bugId, assigneeId) => {
-    setLoading(true)
-    setError(null)
-
-    try {
-      const { error: updateError } = await supabase
-        .from('bugs')
-        .update({ assigned_to: assigneeId || null })
-        .eq('id', bugId)
-
-      if (updateError) throw updateError
-
-      return { success: true }
-    } catch (err) {
-      setError(err.message)
-      return { success: false, error: err.message }
-    } finally {
-      setLoading(false)
-    }
+    console.warn('Assignment feature disabled: schema only supports user_id (owner)')
+    return { success: false, error: 'Assignment not supported in current schema' }
   }, [])
 
   const archiveBug = useCallback(async (bugId) => {

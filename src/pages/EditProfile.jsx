@@ -182,13 +182,20 @@ export default function EditProfile() {
           return
         }
 
-        // Generate public URL
-        const { data: urlData } = supabase.storage
+        // Generate signed URL for private bucket (valid for 1 year)
+        const { data: signedUrlData, error: urlError } = await supabase.storage
           .from('avatars')
-          .getPublicUrl(filePath)
+          .createSignedUrl(filePath, 31536000) // 1 year in seconds
 
-        // Cache-bust to show new avatar immediately
-        finalAvatarUrl = `${urlData.publicUrl}?t=${Date.now()}`
+        if (urlError || !signedUrlData) {
+          console.error('Failed to generate signed URL:', urlError)
+          showToast('Failed to generate avatar URL. Please try again.', 'error')
+          setLoading(false)
+          return
+        }
+
+        // Store signed URL with cache-bust
+        finalAvatarUrl = `${signedUrlData.signedUrl}?t=${Date.now()}`
 
         // Uploaded avatar takes precedence over procedural
         setProceduralAvatarOverride(false)

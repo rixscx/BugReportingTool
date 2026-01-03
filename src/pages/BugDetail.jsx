@@ -61,8 +61,7 @@ export default function BugDetail({ session, isAdmin }) {
         .from('bugs')
         .select(`
           *,
-          reporter:profiles!reported_by(username, email),
-          assignee:profiles!assigned_to(username, email)
+          reporter:profiles!user_id(username)
         `)
         .eq('id', id)
         .single()
@@ -86,7 +85,7 @@ export default function BugDetail({ session, isAdmin }) {
 
   const fetchProfiles = async () => {
     try {
-      const { data } = await supabase.from('profiles').select('id, username, email')
+      const { data } = await supabase.from('profiles').select('id, username')
       setProfiles(data || [])
     } catch {
     }
@@ -121,34 +120,9 @@ export default function BugDetail({ session, isAdmin }) {
   }
 
   const updateAssignee = async (userId) => {
-    setUpdating(true)
-    setError(null)
-    const assignedTo = userId || null
-    const oldAssignee = bug.assignee?.username || bug.assignee?.email || null
-    
-    try {
-      const { error: updateError } = await supabase
-        .from('bugs')
-        .update({ assigned_to: assignedTo })
-        .eq('id', id)
-
-      if (updateError) throw updateError
-
-      const assignee = profiles.find((p) => p.id === assignedTo)
-      setBug({ ...bug, assigned_to: assignedTo, assignee })
-      const newAssigneeName = assignee?.username || assignee?.email || null
-      await supabase.from('bug_activity').insert({
-        bug_id: id,
-        user_id: session.user.id,
-        action: 'assignment_change',
-        old_value: oldAssignee,
-        new_value: newAssigneeName,
-      })
-    } catch {
-      setError('Failed to update assignee')
-    } finally {
-      setUpdating(false)
-    }
+    // SCHEMA COMPLIANCE: assigned_to field does not exist in authoritative schema
+    console.warn('Assignment feature disabled: schema only supports user_id (owner)')
+    return
   }
 
   const archiveBug = async () => {

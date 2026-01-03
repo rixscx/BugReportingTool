@@ -14,7 +14,7 @@ export default function CommentSection({ bugId, session }) {
         .from('comments')
         .select(`
           *,
-          user:profiles!user_id(username, email)
+          user:profiles!user_id(username)
         `)
         .eq('bug_id', bugId)
         .order('created_at', { ascending: true })
@@ -45,7 +45,7 @@ export default function CommentSection({ bugId, session }) {
             .from('comments')
             .select(`
               *,
-              user:profiles!user_id(username, email)
+              user:profiles!user_id(username)
             `)
             .eq('id', payload.new.id)
             .single()
@@ -81,7 +81,7 @@ export default function CommentSection({ bugId, session }) {
         })
         .select(`
           *,
-          user:profiles!user_id(username, email)
+          user:profiles!user_id(username)
         `)
         .single()
 
