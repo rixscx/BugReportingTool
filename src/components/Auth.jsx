@@ -93,16 +93,7 @@ export default function Auth() {
 
     try {
       if (isSignUp) {
-        const { data: existingUsers } = await supabase
-          .from('profiles')
-          .select('email')
-          .eq('email', email)
-          .limit(1)
-
-        if (existingUsers && existingUsers.length > 0) {
-          throw new Error('ACCOUNT_EXISTS')
-        }
-
+        // IDENTITY INVARIANT: Never query by email; Supabase auth.signUp handles duplicates
         const { data, error: signUpError } = await supabase.auth.signUp({
           email,
           password,

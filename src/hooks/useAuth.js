@@ -176,7 +176,7 @@ export function useAuth() {
           .from('profiles')
           .update({
             avatar_url: userMetadata.avatar_url,
-            full_name: fullNameFromProvider ?? data.full_name ?? null,
+            full_name: fullNameFromProvider || data.full_name || null,
           })
           .eq('id', userId)
           .select()
@@ -226,10 +226,10 @@ export function useAuth() {
         persistProceduralSeed(userId, null)
         persistProceduralOverride(userId, false)
       } else {
+        // PROCEDURAL INVARIANT: Seed only comes from explicit generation; never auto-derive from user.id
         const storedSeed = getStoredProceduralSeed(userId)
-        const seedToUse = storedSeed || userId
-        persistProceduralSeed(userId, seedToUse)
         const storedOverride = getStoredProceduralOverride(userId)
+        persistProceduralSeed(userId, storedSeed)
         persistProceduralOverride(userId, storedOverride)
       }
 

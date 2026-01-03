@@ -136,8 +136,9 @@ export default function EditProfile() {
     setProceduralAvatarSeed(newSeed)
     setProceduralAvatarOverride(true)
     
-    // Clear uploaded file preview so procedural can display
+    // Clear uploaded file preview and state so procedural can display
     setAvatarFile(null)
+    setAvatarUrl('') // Clear stale upload preview
     
     // Immediately update local avatar state with new procedural avatar (preview only, never persisted)
     const newAvatarUrl = generateAvatarUrl(newSeed)
