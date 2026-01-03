@@ -20,12 +20,50 @@ export default function ActivityTimeline({ bugId }) {
 
   useEffect(() => {
     fetchActivities()
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [fetchActivities])
+    const channel = supabase
+      .channel(`bug-activity-${bugId}`)
+      .on(
+        'postgres_changes',
+        {
+          event: 'INSERT',
+          schema: 'public',
+          table: 'bug_activity',
+          filter: `bug_id=eq.${bugId}`,
+        },
+        async () => {
+          await fetchActivities()
+        }
+      )
+      .subscribe()
+
+    return () => {
+      supabase.removeChannel(channel)
+    }
+  }, [bugId, fetchActivities])
 
   const getActionIcon = (action) => {
     switch (action) {
+      case 'bug_archived':
+        return (
+          <div className="w-8 h-8 bg-amber-100 rounded-full flex items-center justify-center">
+            <svg className="w-4 h-4 text-amber-600" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M5 8h14M5 8a2 2 0 110-4h14a2 2 0 110 4M5 8v10a2 2 0 002 2h10a2 2 0 002-2V8m-9 4h4" />
+            </svg>
+          </div>
+        )
+      case 'bug_restored':
+        return (
+          <div className="w-8 h-8 bg-emerald-100 rounded-full flex items-center justify-center">
+            <svg className="w-4 h-4 text-emerald-600" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M4 4v5h.582m15.356 2A8.001 8.001 0 004.582 9m0 0H9m11 11v-5h-.581m0 0a8.003 8.003 0 01-15.357-2m15.357 2H15" />
+            </svg>
+          </div>
+        )
+      case 'comment_deleted':
+      case 'comment_updated':
+      case 'bug_created':
       case 'status_change':
+      case 'bug_status_changed':
         return (
           <div className="w-8 h-8 bg-purple-100 rounded-full flex items-center justify-center">
             <svg className="w-4 h-4 text-purple-600" fill="none" viewBox="0 0 24 24" stroke="currentColor">
@@ -42,6 +80,7 @@ export default function ActivityTimeline({ bugId }) {
           </div>
         )
       case 'comment_added':
+      case 'comment_created':
         return (
           <div className="w-8 h-8 bg-green-100 rounded-full flex items-center justify-center">
             <svg className="w-4 h-4 text-green-600" fill="none" viewBox="0 0 24 24" stroke="currentColor">
@@ -64,14 +103,17 @@ export default function ActivityTimeline({ bugId }) {
     const userName = activity.actor_email || activity.user?.username || activity.user?.email || 'Someone'
     const oldVal = activity.metadata?.old_value || activity.old_value
     const newVal = activity.metadata?.new_value || activity.new_value
+    const oldStatus = activity.metadata?.old_status
+    const newStatus = activity.metadata?.new_status
 
     switch (activity.action) {
+      case 'bug_status_changed':
       case 'status_change':
         return (
           <>
             <span className="font-medium">{userName}</span> changed status from{' '}
-            <span className="font-medium">{oldVal || 'None'}</span> to{' '}
-            <span className="font-medium">{newVal}</span>
+            <span className="font-medium">{oldStatus || oldVal || 'None'}</span> to{' '}
+            <span className="font-medium">{newStatus || newVal}</span>
           </>
         )
       case 'assignment_change':
@@ -82,9 +124,40 @@ export default function ActivityTimeline({ bugId }) {
           </>
         )
       case 'comment_added':
+      case 'comment_created':
         return (
           <>
             <span className="font-medium">{userName}</span> added a comment
+          </>
+        )
+      case 'comment_updated':
+        return (
+          <>
+            <span className="font-medium">{userName}</span> edited a comment
+          </>
+        )
+      case 'comment_deleted':
+        return (
+          <>
+            <span className="font-medium">{userName}</span> deleted a comment
+          </>
+        )
+      case 'bug_archived':
+        return (
+          <>
+            <span className="font-medium">{userName}</span> archived this bug
+          </>
+        )
+      case 'bug_restored':
+        return (
+          <>
+            <span className="font-medium">{userName}</span> restored this bug
+          </>
+        )
+      case 'bug_created':
+        return (
+          <>
+            <span className="font-medium">{userName}</span> reported this bug
           </>
         )
       default:

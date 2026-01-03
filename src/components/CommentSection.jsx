@@ -7,6 +7,9 @@ export default function CommentSection({ bugId, session }) {
   const [loading, setLoading] = useState(true)
   const [submitting, setSubmitting] = useState(false)
   const [error, setError] = useState(null)
+  const [editingCommentId, setEditingCommentId] = useState(null)
+  const [editText, setEditText] = useState('')
+  const [commentActionId, setCommentActionId] = useState(null)
 
   const fetchComments = useCallback(async () => {
     try {
@@ -54,32 +57,13 @@ export default function CommentSection({ bugId, session }) {
       .on(
         'postgres_changes',
         {
-          event: 'INSERT',
+          event: '*',
           schema: 'public',
           table: 'comments',
           filter: `bug_id=eq.${bugId}`,
         },
-        async (payload) => {
-          const { data: comment } = await supabase
-            .from('comments')
-            .select(`*`)
-            .eq('id', payload.new.id)
-            .single()
-
-          if (comment) {
-            // fetch profile for the commenter
-            const { data: [profile] = [] } = await supabase
-              .from('profiles')
-              .select('id, username, email, full_name')
-              .eq('id', comment.user_id)
-
-            const enriched = { ...comment, user: profile || null }
-
-            setComments((prev) => {
-              if (prev.some((c) => c.id === enriched.id)) return prev
-              return [...prev, enriched]
-            })
-          }
+        async () => {
+          await fetchComments()
         }
       )
       .subscribe()
@@ -116,19 +100,93 @@ export default function CommentSection({ bugId, session }) {
           .eq('id', session.user.id)
 
         const enriched = { ...inserted, user: profile || null }
-        setComments([...comments, enriched])
+        setComments((prev) => [...prev, enriched])
         setNewComment('')
         await supabase.from('bug_activity').insert({
           bug_id: bugId,
+          user_id: session.user.id,
           actor_id: session.user.id,
           actor_email: session.user.email,
-          action: 'comment_added',
+          action: 'comment_created',
+          metadata: { comment_id: inserted.id },
         })
       }
     } catch (err) {
       setError('Failed to post comment: ' + err.message)
     } finally {
       setSubmitting(false)
+    }
+  }
+
+  const handleDelete = async (comment) => {
+    if (comment.user_id !== session.user.id) return
+    const confirmed = window.confirm('Delete this comment?')
+    if (!confirmed) return
+    setCommentActionId(comment.id)
+    setError(null)
+    try {
+      const { error: deleteError } = await supabase
+        .from('comments')
+        .delete()
+        .eq('id', comment.id)
+
+      if (deleteError) throw deleteError
+
+      setComments((prev) => prev.filter((c) => c.id !== comment.id))
+
+      await supabase.from('bug_activity').insert({
+        bug_id: bugId,
+        user_id: session.user.id,
+        actor_id: session.user.id,
+        actor_email: session.user.email,
+        action: 'comment_deleted',
+        metadata: { comment_id: comment.id },
+      })
+    } catch (err) {
+      setError('Failed to delete comment: ' + err.message)
+    } finally {
+      setCommentActionId(null)
+    }
+  }
+
+  const startEditing = (comment) => {
+    setEditingCommentId(comment.id)
+    setEditText(comment.content)
+  }
+
+  const cancelEditing = () => {
+    setEditingCommentId(null)
+    setEditText('')
+  }
+
+  const handleUpdate = async (comment) => {
+    if (!editText.trim()) return
+    setCommentActionId(comment.id)
+    setError(null)
+    try {
+      const { error: updateError } = await supabase
+        .from('comments')
+        .update({ content: editText.trim() })
+        .eq('id', comment.id)
+
+      if (updateError) throw updateError
+
+      setComments((prev) => prev.map((c) => (c.id === comment.id ? { ...c, content: editText.trim() } : c)))
+      setEditingCommentId(null)
+      setEditText('')
+
+      await supabase.from('bug_activity').insert({
+        bug_id: bugId,
+        user_id: session.user.id,
+        actor_id: session.user.id,
+        actor_email: session.user.email,
+        action: 'comment_updated',
+        metadata: { comment_id: comment.id },
+      })
+    } catch (err) {
+      setError('Failed to update comment: ' + err.message)
+    } finally {
+      setCommentActionId(null)
     }
   }
 
@@ -168,8 +226,58 @@ export default function CommentSection({ bugId, session }) {
                   <span className="text-xs text-slate-400">
                     {new Date(comment.created_at).toLocaleString()}
                   </span>
+                  {comment.user_id === session?.user?.id && (
+                    <div className="ml-auto flex items-center gap-2 text-xs text-slate-400">
+                      <button
+                        type="button"
+                        onClick={() => startEditing(comment)}
+                        disabled={commentActionId === comment.id}
+                        className="hover:text-slate-600"
+                      >
+                        Edit
+                      </button>
+                      <button
+                        type="button"
+                        onClick={() => handleDelete(comment)}
+                        disabled={commentActionId === comment.id}
+                        className="hover:text-red-600"
+                      >
+                        Delete
+                      </button>
+                    </div>
+                  )}
                 </div>
-                <p className="text-slate-600 text-sm whitespace-pre-wrap">{comment.content}</p>
+                {editingCommentId === comment.id ? (
+                  <div className="space-y-2">
+                    <textarea
+                      value={editText}
+                      onChange={(e) => setEditText(e.target.value)}
+                      rows={3}
+                      className="w-full px-3 py-2 bg-slate-50 border border-slate-200 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent resize-none"
+                      disabled={commentActionId === comment.id}
+                    />
+                    <div className="flex items-center gap-2">
+                      <button
+                        type="button"
+                        onClick={() => handleUpdate(comment)}
+                        disabled={commentActionId === comment.id || !editText.trim()}
+                        className="bg-blue-600 text-white px-3 py-1.5 rounded-md text-xs font-medium hover:bg-blue-700 disabled:opacity-50 disabled:cursor-not-allowed"
+                      >
+                        Save
+                      </button>
+                      <button
+                        type="button"
+                        onClick={cancelEditing}
+                        disabled={commentActionId === comment.id}
+                        className="text-slate-500 hover:text-slate-700 text-xs font-medium"
+                      >
+                        Cancel
+                      </button>
+                    </div>
+                  </div>
+                ) : (
+                  <p className="text-slate-600 text-sm whitespace-pre-wrap">{comment.content}</p>
+                )}
               </div>
             </div>
           ))}

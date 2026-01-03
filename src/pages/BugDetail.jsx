@@ -99,10 +99,11 @@ export default function BugDetail({ session, isAdmin }) {
       setBug({ ...bug, status: newStatus })
       await supabase.from('bug_activity').insert({
         bug_id: id,
+        user_id: session.user.id,
         actor_id: session.user.id,
         actor_email: session.user.email,
-        action: 'status_change',
-        metadata: { old_value: oldStatus, new_value: newStatus },
+        action: 'bug_status_changed',
+        metadata: { old_status: oldStatus, new_status: newStatus },
       })
     } catch {
       setError('Failed to update status')
@@ -114,6 +115,7 @@ export default function BugDetail({ session, isAdmin }) {
 
 
   const archiveBug = async () => {
+    if (!isAdmin) return
     const confirmed = await archiveDialog.confirm({
       title: 'Archive Bug',
       description: 'Are you sure you want to archive this bug? It will be hidden from the dashboard but can be restored later.',
@@ -137,9 +139,10 @@ export default function BugDetail({ session, isAdmin }) {
       // Log activity
       await supabase.from('bug_activity').insert({
         bug_id: id,
+        user_id: session.user.id,
         actor_id: session.user.id,
         actor_email: session.user.email,
-        action: 'archived',
+        action: 'bug_archived',
         metadata: { previous_is_archived: false },
       })
 
@@ -154,6 +157,7 @@ export default function BugDetail({ session, isAdmin }) {
   }
 
   const restoreBug = async () => {
+    if (!isAdmin) return
     setUpdating(true)
     setError(null)
     
@@ -168,9 +172,10 @@ export default function BugDetail({ session, isAdmin }) {
       // Log activity
       await supabase.from('bug_activity').insert({
         bug_id: id,
+        user_id: session.user.id,
         actor_id: session.user.id,
         actor_email: session.user.email,
-        action: 'restored',
+        action: 'bug_restored',
         metadata: { previous_is_archived: true },
       })
 
@@ -319,7 +324,7 @@ export default function BugDetail({ session, isAdmin }) {
                   </svg>
                 </DropdownMenuTrigger>
                 <DropdownMenuContent open={open} align="end">
-                  {!bug.is_archived && (
+                  {isAdmin && !bug.is_archived && (
                     <DropdownMenuItem 
                       onClick={() => { setOpen(false); archiveBug(); }} 
                       disabled={updating}
@@ -330,7 +335,7 @@ export default function BugDetail({ session, isAdmin }) {
                       Archive
                     </DropdownMenuItem>
                   )}
-                  {bug.is_archived && (
+                  {isAdmin && bug.is_archived && (
                     <DropdownMenuItem 
                       onClick={() => { setOpen(false); restoreBug(); }} 
                       disabled={updating}

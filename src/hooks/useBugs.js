@@ -127,10 +127,11 @@ export function useBugMutations() {
       if (updateError) throw updateError
       await supabase.from('bug_activity').insert({
         bug_id: bugId,
+        user_id: userId,
         actor_id: userId,
         actor_email: userEmail,
-        action: 'status_change',
-        metadata: { old_value: oldStatus, new_value: newStatus },
+        action: 'bug_status_changed',
+        metadata: { old_status: oldStatus, new_status: newStatus },
       })
 
       return { success: true }
