@@ -8,10 +8,7 @@ export default function ActivityTimeline({ bugId }) {
   const fetchActivities = useCallback(async () => {
     const { data, error } = await supabase
       .from('bug_activity')
-      .select(`
-        *,
-        user:profiles!user_id(username, email)
-      `)
+      .select(`*`)
       .eq('bug_id', bugId)
       .order('created_at', { ascending: false })
 
@@ -64,22 +61,24 @@ export default function ActivityTimeline({ bugId }) {
   }
 
   const getActionText = (activity) => {
-    const userName = activity.user?.username || activity.user?.email || 'Someone'
-    
+    const userName = activity.actor_email || activity.user?.username || activity.user?.email || 'Someone'
+    const oldVal = activity.metadata?.old_value || activity.old_value
+    const newVal = activity.metadata?.new_value || activity.new_value
+
     switch (activity.action) {
       case 'status_change':
         return (
           <>
             <span className="font-medium">{userName}</span> changed status from{' '}
-            <span className="font-medium">{activity.old_value || 'None'}</span> to{' '}
-            <span className="font-medium">{activity.new_value}</span>
+            <span className="font-medium">{oldVal || 'None'}</span> to{' '}
+            <span className="font-medium">{newVal}</span>
           </>
         )
       case 'assignment_change':
         return (
           <>
-            <span className="font-medium">{userName}</span> {activity.new_value ? 'assigned to' : 'unassigned from'}{' '}
-            <span className="font-medium">{activity.new_value || activity.old_value}</span>
+            <span className="font-medium">{userName}</span> {newVal ? 'assigned to' : 'unassigned from'}{' '}
+            <span className="font-medium">{newVal || oldVal}</span>
           </>
         )
       case 'comment_added':

@@ -46,7 +46,6 @@ export default function BugDetail({ session, isAdmin }) {
   const deleteDialog = useConfirmDialog()
   
   const [bug, setBug] = useState(null)
-  const [profiles, setProfiles] = useState([])
   const [loading, setLoading] = useState(true)
   const [updating, setUpdating] = useState(false)
   const [error, setError] = useState(null)
@@ -59,10 +58,7 @@ export default function BugDetail({ session, isAdmin }) {
     try {
       const { data, error: fetchError } = await supabase
         .from('bugs')
-        .select(`
-          *,
-          reporter:profiles!user_id(username)
-        `)
+        .select(`*`)
         .eq('id', id)
         .single()
 
@@ -79,17 +75,8 @@ export default function BugDetail({ session, isAdmin }) {
 
   useEffect(() => {
     fetchBug()
-    fetchProfiles()
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [id])
-
-  const fetchProfiles = async () => {
-    try {
-      const { data } = await supabase.from('profiles').select('id, username')
-      setProfiles(data || [])
-    } catch {
-    }
-  }
 
   const updateStatus = async (newStatus) => {
     setUpdating(true)
@@ -107,10 +94,10 @@ export default function BugDetail({ session, isAdmin }) {
       setBug({ ...bug, status: newStatus })
       await supabase.from('bug_activity').insert({
         bug_id: id,
-        user_id: session.user.id,
+        actor_id: session.user.id,
+        actor_email: session.user.email,
         action: 'status_change',
-        old_value: oldStatus,
-        new_value: newStatus,
+        metadata: { old_value: oldStatus, new_value: newStatus },
       })
     } catch {
       setError('Failed to update status')
@@ -119,11 +106,7 @@ export default function BugDetail({ session, isAdmin }) {
     }
   }
 
-  const updateAssignee = async (userId) => {
-    // SCHEMA COMPLIANCE: assigned_to field does not exist in authoritative schema
-    console.warn('Assignment feature disabled: schema only supports user_id (owner)')
-    return
-  }
+
 
   const archiveBug = async () => {
     const confirmed = await archiveDialog.confirm({
@@ -339,26 +322,6 @@ export default function BugDetail({ session, isAdmin }) {
                     <option value="Resolved">Resolved</option>
                   </select>
                 </div>
-
-                <div>
-                  <label className="block text-xs font-medium text-slate-500 uppercase tracking-wide mb-2">
-                    Assigned To
-                    {!isAdmin && <span className="text-slate-400 normal-case ml-1">(Admin only)</span>}
-                  </label>
-                  <select
-                    value={bug.assigned_to || ''}
-                    onChange={(e) => updateAssignee(e.target.value)}
-                    disabled={updating || !isAdmin}
-                    className="w-full px-3 py-2.5 bg-slate-50 border border-slate-200 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-blue-500 disabled:opacity-50 disabled:cursor-not-allowed"
-                  >
-                    <option value="">Unassigned</option>
-                    {profiles.map((profile) => (
-                      <option key={profile.id} value={profile.id}>
-                        {profile.username || profile.email}
-                      </option>
-                    ))}
-                  </select>
-                </div>
               </div>
             </div>
 
@@ -367,11 +330,13 @@ export default function BugDetail({ session, isAdmin }) {
               <h3 className="text-sm font-semibold text-slate-700 mb-4">Reporter</h3>
               <div className="flex items-center gap-3">
                 <div className="w-10 h-10 rounded-full bg-gradient-to-br from-blue-500 to-indigo-500 flex items-center justify-center text-white font-medium">
-                  {(bug.reporter?.username || bug.reporter?.email || 'U')[0].toUpperCase()}
+                  {(
+                    bug.reported_by_name || (bug.reported_by_email ? bug.reported_by_email.split('@')[0] : null) || 'U'
+                  )[0].toUpperCase()}
                 </div>
                 <div>
                   <p className="font-medium text-slate-800 text-sm">
-                    {bug.reporter?.username || bug.reporter?.email || 'Unknown'}
+                    {bug.reported_by_name || bug.reported_by_email || 'Unknown'}
                   </p>
                   <p className="text-xs text-slate-400" title={new Date(bug.created_at).toLocaleString()}>
                     {formatSmartDate(bug.created_at)}
@@ -379,6 +344,7 @@ export default function BugDetail({ session, isAdmin }) {
                 </div>
               </div>
             </div>
+          </div>
 
             {/* Admin Actions */}
             {isAdmin && (
@@ -408,7 +374,6 @@ export default function BugDetail({ session, isAdmin }) {
                 </div>
               </div>
             )}
-          </div>
         </div>
       </div>
 

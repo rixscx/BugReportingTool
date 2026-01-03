@@ -11,7 +11,6 @@ export function exportToCSV(bugs, filename = 'bugs-export') {
     { key: 'status', label: 'Status' },
     { key: 'priority', label: 'Priority' },
     { key: 'reporter', label: 'Reporter' },
-    { key: 'assignee', label: 'Assignee' },
     { key: 'created_at', label: 'Created At' },
     { key: 'updated_at', label: 'Updated At' },
   ]
@@ -21,10 +20,7 @@ export function exportToCSV(bugs, filename = 'bugs-export') {
       let value = ''
       switch (col.key) {
         case 'reporter':
-          value = bug.reporter?.username || bug.reporter?.email || ''
-          break
-        case 'assignee':
-          value = bug.assignee?.username || bug.assignee?.email || ''
+          value = bug.reported_by_name || bug.reported_by_email || ''
           break
         case 'created_at':
         case 'updated_at':
@@ -68,8 +64,7 @@ export function exportToJSON(bugs, filename = 'bugs-export') {
     status: bug.status,
     priority: bug.priority,
     steps_to_reproduce: bug.steps_to_reproduce,
-    reporter: bug.reporter?.username || bug.reporter?.email || null,
-    assignee: bug.assignee?.username || bug.assignee?.email || null,
+    reporter: bug.reported_by_name || bug.reported_by_email || null,
     created_at: bug.created_at,
     updated_at: bug.updated_at,
     is_archived: bug.is_archived,

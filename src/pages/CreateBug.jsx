@@ -166,6 +166,15 @@ export default function CreateBug({ session }) {
     let imageUrl = null
 
     try {
+      // Ensure profile is available before any DB or storage operations
+      if (!userProfile) {
+        const msg = 'Profile not ready, please retry'
+        setError(msg)
+        showToast(msg, 'error')
+        setLoading(false)
+        setSubmitting(false)
+        return
+      }
       // PHASE 1 — STEP 1: Upload image FIRST (if present)
       // If this fails, we abort BEFORE creating any DB row
       if (imageFile) {
@@ -200,14 +209,18 @@ export default function CreateBug({ session }) {
 
       // PHASE 1 — STEP 3: Insert bug ONLY after successful image upload
       // image_url is normalized to null if not set (never undefined)
+      // SCHEMA: Add snapshot fields for display
       const { error: insertError } = await supabase.from('bugs').insert({
         title: formData.title,
         description: fullDescription,
         steps_to_reproduce: formData.steps_to_reproduce,
         priority: formData.priority,
         status: 'Open',
+        is_archived: false,
         image_url: imageUrl ?? null, // PHASE 1: ALWAYS string or null
         user_id: session.user.id, // RLS: user_id matches auth.uid()
+        reported_by_email: session.user.email,
+        reported_by_name: userProfile?.full_name || userProfile?.username || null,
       })
 
       // PHASE 1: Fail loudly on database errors

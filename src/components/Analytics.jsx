@@ -36,7 +36,7 @@ export default function Analytics({ bugs }) {
         }, 0) / resolvedBugs.length)
       : 0
     const reporterCounts = bugs.reduce((acc, bug) => {
-      const name = bug.reporter?.username || bug.reporter?.email?.split('@')[0] || 'Unknown'
+      const name = bug.reported_by_name || (bug.reported_by_email ? bug.reported_by_email.split('@')[0] : 'Unknown')
       acc[name] = (acc[name] || 0) + 1
       return acc
     }, {})

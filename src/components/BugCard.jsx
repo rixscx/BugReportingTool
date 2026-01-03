@@ -48,23 +48,6 @@ export default function BugCard({ bug }) {
           {/* Footer */}
           <div className="flex items-center justify-between pt-4 border-t border-slate-100">
             <StatusBadge status={bug.status} />
-            
-            <div className="flex items-center gap-2">
-              {bug.assignee ? (
-                <div className="flex items-center gap-1.5 text-sm text-slate-500">
-                  <div className="w-6 h-6 bg-gradient-to-br from-blue-500 to-indigo-500 rounded-full flex items-center justify-center ring-2 ring-white shadow-sm">
-                    <span className="text-xs text-white font-semibold">
-                      {(bug.assignee.username || bug.assignee.email)?.[0]?.toUpperCase()}
-                    </span>
-                  </div>
-                  <span className="text-xs font-medium truncate max-w-[80px]">
-                    {bug.assignee.username || bug.assignee.email?.split('@')[0]}
-                  </span>
-                </div>
-              ) : (
-                <span className="text-xs text-slate-400 italic bg-slate-50 px-2 py-1 rounded-full">Unassigned</span>
-              )}
-            </div>
           </div>
 
           {/* Meta */}
@@ -75,12 +58,12 @@ export default function BugCard({ bug }) {
               </svg>
               {formatSmartDate(bug.created_at)}
             </span>
-            {bug.reporter && (
+            {(bug.reported_by_name || bug.reported_by_email) && (
               <span className="truncate ml-2 flex items-center gap-1.5 bg-slate-50 px-2 py-1 rounded-full">
                 <svg className="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                   <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M16 7a4 4 0 11-8 0 4 4 0 018 0zM12 14a7 7 0 00-7 7h14a7 7 0 00-7-7z" />
                 </svg>
-                {bug.reporter.username || bug.reporter.email?.split('@')[0]}
+                {bug.reported_by_name || (bug.reported_by_email ? bug.reported_by_email.split('@')[0] : '')}
               </span>
             )}
           </div>

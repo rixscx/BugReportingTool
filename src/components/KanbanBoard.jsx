@@ -128,15 +128,8 @@ export default function KanbanBoard({ bugs, onUpdate }) {
                         }`}>
                           {bug.priority}
                         </span>
-                        {bug.assignee ? (
-                          <div className="w-6 h-6 bg-blue-100 rounded-full flex items-center justify-center" title={bug.assignee.username || bug.assignee.email}>
-                            <span className="text-xs text-blue-600 font-medium">
-                              {(bug.assignee.username || bug.assignee.email)?.[0]?.toUpperCase()}
-                            </span>
-                          </div>
-                        ) : (
-                          <span className="text-xs text-slate-400">—</span>
-                        )}
+                        {/* Assignment disabled in schema */}
+                        <span className="text-xs text-slate-400">—</span>
                       </div>
                     </Link>
                   </div>

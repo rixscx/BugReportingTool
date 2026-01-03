@@ -19,10 +19,7 @@ export function useBugs(options = {}) {
 
       let query = supabase
         .from('bugs')
-        .select(`
-          *,
-          reporter:profiles!user_id(username)
-        `)
+        .select(`*`)
         .order('created_at', { ascending: false })
 
       if (!includeArchived) {
@@ -68,10 +65,7 @@ export function useBug(bugId) {
 
       const { data, error: fetchError } = await supabase
         .from('bugs')
-        .select(`
-          *,
-          reporter:profiles!user_id(username)
-        `)
+        .select(`*`)
         .eq('id', bugId)
         .single()
 
@@ -102,7 +96,7 @@ export function useBugMutations() {
   const [loading, setLoading] = useState(false)
   const [error, setError] = useState(null)
 
-  const updateStatus = useCallback(async (bugId, newStatus, userId) => {
+  const updateStatus = useCallback(async (bugId, newStatus, userId, userEmail, oldStatus) => {
     setLoading(true)
     setError(null)
 
@@ -115,9 +109,10 @@ export function useBugMutations() {
       if (updateError) throw updateError
       await supabase.from('bug_activity').insert({
         bug_id: bugId,
-        user_id: userId,
+        actor_id: userId,
+        actor_email: userEmail,
         action: 'status_change',
-        new_value: newStatus,
+        metadata: { old_value: oldStatus, new_value: newStatus },
       })
 
       return { success: true }

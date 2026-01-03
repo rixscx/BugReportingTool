@@ -81,11 +81,19 @@ export async function uploadBugImage(imageFile, bugTitle, reporter) {
   
   // Build strict filename format
   const fileName = `${sanitizedTitle}-${sanitizedReporter}.png`
+
+  // RLS COMPLIANCE: Object path must be prefixed with auth.uid()
+  const { data: userData, error: userError } = await supabase.auth.getUser()
+  const userId = userData?.user?.id || null
+  if (userError || !userId) {
+    throw new Error('INVARIANT VIOLATION: Unable to resolve authenticated user for storage path')
+  }
+  const objectPath = `${userId}/${fileName}`
   
   // STORAGE ISOLATION INVARIANT: Upload to hardcoded bucket ONLY
   const { error: uploadError } = await supabase.storage
     .from(BUG_IMAGES_BUCKET) // INVARIANT: Uses constant, never parameterized
-    .upload(fileName, imageFile, { upsert: true })
+    .upload(objectPath, imageFile, { upsert: true })
   
   if (uploadError) {
     // DB/RLS AUDIT: Fail loudly with detailed error
@@ -101,7 +109,7 @@ export async function uploadBugImage(imageFile, bugTitle, reporter) {
   // STORAGE COMPLIANCE: Use signed URL for PRIVATE bucket (valid for 1 year)
   const { data, error: urlError } = await supabase.storage
     .from(BUG_IMAGES_BUCKET)
-    .createSignedUrl(fileName, 31536000) // 1 year in seconds
+    .createSignedUrl(objectPath, 31536000) // 1 year in seconds
   
   if (urlError || !data || !data.signedUrl) {
     // DB/RLS AUDIT: Fail loudly if URL generation fails
@@ -115,7 +123,7 @@ export async function uploadBugImage(imageFile, bugTitle, reporter) {
   
   // PERF POLISH: Remove noisy success log in production
   if (process.env.NODE_ENV === 'development') {
-    console.log('✅ Bug image uploaded:', fileName)
+    console.log('✅ Bug image uploaded:', objectPath)
   }
   
   return data.signedUrl

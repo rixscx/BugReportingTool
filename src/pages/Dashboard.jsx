@@ -66,8 +66,9 @@ export default function Dashboard() {
           const query = debouncedSearch.toLowerCase()
           const matchesTitle = bug.title?.toLowerCase().includes(query)
           const matchesDescription = bug.description?.toLowerCase().includes(query)
-          const matchesReporter = bug.reporter?.username?.toLowerCase().includes(query) ||
-            bug.reporter?.email?.toLowerCase().includes(query)
+          const reporterName = (bug.reported_by_name) || (bug.reported_by_email ? bug.reported_by_email.split('@')[0] : '')
+          const matchesReporter = (reporterName || '').toLowerCase().includes(query) ||
+            (bug.reported_by_email || '').toLowerCase().includes(query)
           if (!matchesTitle && !matchesDescription && !matchesReporter) return false
         }
         return true

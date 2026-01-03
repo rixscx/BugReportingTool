@@ -145,46 +145,46 @@ export function useAuth() {
       }
 
       // INVARIANT ENFORCED: Profile must exist already (no healing/upserts on read)
-      // EXCEPTION: OAuth users may not have profiles yet - create on first login
+      // NOTE: Database trigger may create the profile asynchronously on auth signup/login.
+      // Retry a few times before failing to avoid transient race conditions.
       const noProfile = (!data && !error) || error?.code === 'PGRST116'
       if (noProfile) {
-        const provider = userMetadata?.provider || userMetadata?.iss || ''
-        const isGoogleProvider = typeof provider === 'string' && provider.toLowerCase().includes('google')
-        
-        // OAuth users: create profile on first login with provider metadata
-        if (isGoogleProvider) {
-          console.log('🔐 OAuth user without profile - creating from metadata:', userId)
-          
-          const fullNameFromProvider = userMetadata?.full_name || userMetadata?.name || null
-          const avatarUrlFromProvider = userMetadata?.avatar_url || null
-          
-          const { data: newProfile, error: insertError } = await supabase
+        const maxRetries = 5
+        const retryDelayMs = 300
+        let found = null
+        for (let i = 0; i < maxRetries; i++) {
+          // small backoff
+          // eslint-disable-next-line no-await-in-loop
+          await new Promise((res) => setTimeout(res, retryDelayMs))
+          // eslint-disable-next-line no-await-in-loop
+          const { data: retryData, error: retryError } = await supabase
             .from('profiles')
-            .insert({
-              id: userId,
-              email: userEmail,
-              username: usernameFromEmail,
-              full_name: fullNameFromProvider,
-              avatar_url: avatarUrlFromProvider,
-              role: 'user',
-            })
-            .select()
+            .select('*')
+            .eq('id', userId)
             .maybeSingle()
-          
-          if (insertError) {
-            console.error('❌ Failed to create OAuth profile:', insertError)
-            throw new Error(`Failed to create profile: ${insertError.message}`)
+          if (retryError) {
+            // If permission errors occur, surface immediately
+            if (retryError.code === 'PGRST301' || retryError.message?.includes('permission')) {
+              console.error('❌ RLS/Permission error fetching profile on retry:', retryError)
+              throw new Error(`Database access denied. Please contact support. (${retryError.code})`)
+            }
+            continue
           }
-          
-          if (newProfile) {
-            setUserProfile(newProfile)
-            setLoading(false)
-            fetchingRef.current = false
-            return
+          if (retryData && retryData.id) {
+            found = retryData
+            break
           }
         }
-        
-        // Non-OAuth users without profile is an error
+
+        if (found) {
+          setUserProfile(found)
+          // proceed without attempting any frontend writes
+          fetchingRef.current = false
+          setLoading(false)
+          return
+        }
+
+        // After retries, still missing -> invariant violation
         throw new Error('INVARIANT VIOLATION: profile missing for authenticated user')
       }
 
@@ -203,37 +203,8 @@ export function useAuth() {
         throw new Error('INVARIANT VIOLATION: profiles row missing. Frontend must not fabricate profiles.')
       }
 
-      // OAuth avatar source of truth: persist provider avatar once if missing
-      const provider = userMetadata?.provider || userMetadata?.iss || ''
-      const isGoogleProvider = typeof provider === 'string' && provider.toLowerCase().includes('google')
-      let profileData = data
-
-      if (isGoogleProvider && !data.avatar_url && userMetadata?.avatar_url) {
-        const fullNameFromProvider = userMetadata.full_name || userMetadata.name || null
-        const { data: updatedProfile, error: avatarUpdateError } = await supabase
-          .from('profiles')
-          .update({
-            avatar_url: userMetadata.avatar_url,
-            full_name: fullNameFromProvider || data.full_name || null,
-          })
-          .eq('id', userId)
-          .select()
-          .maybeSingle()
-
-        if (avatarUpdateError) {
-          console.error('❌ OAUTH AVATAR SYNC FAILED:', {
-            code: avatarUpdateError.code,
-            message: avatarUpdateError.message,
-            userId
-          })
-        } else if (updatedProfile?.avatar_url) {
-          profileData = updatedProfile
-        }
-      }
-
-      // Use profile data as-is from database, avatar_url may be null (valid state)
-      // Profiles must ONLY come from database.
-      setUserProfile(profileData)
+      // Use profile data as-is from database. Do NOT perform frontend writes (no upserts/updates).
+      setUserProfile(data)
     } catch (err) {
       // PHASE 2 FIX: Fatal errors should surface to user - no silent fallback
       console.error('❌ PHASE 2: Fatal profile error:', err)
@@ -411,9 +382,9 @@ export function useAuth() {
     persistProceduralOverride(session.user.id, overrideValue)
   }, [persistProceduralOverride, session?.user?.id])
 
-  const isAdmin = userProfile?.role === 'admin'
   const isAuthenticated = !!session
   const isTestAccount = session?.user?.email?.includes('test.')
+  const isAdmin = !!(userProfile && userProfile.is_admin === true)
 
   return {
     session,

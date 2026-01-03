@@ -12,15 +12,34 @@ export default function CommentSection({ bugId, session }) {
     try {
       const { data, error: fetchError } = await supabase
         .from('comments')
-        .select(`
-          *,
-          user:profiles!user_id(username)
-        `)
+        .select(`*`)
         .eq('bug_id', bugId)
         .order('created_at', { ascending: true })
 
       if (fetchError) throw fetchError
-      setComments(data || [])
+      const commentsData = data || []
+
+      // Load commenter profiles in a separate query (no relational join)
+      const userIds = Array.from(new Set(commentsData.map(c => c.user_id).filter(Boolean)))
+      let profilesMap = {}
+      if (userIds.length > 0) {
+        const { data: profiles } = await supabase
+          .from('profiles')
+          .select('id, username, email, full_name')
+          .in('id', userIds)
+        profilesMap = (profiles || []).reduce((acc, p) => {
+          acc[p.id] = p
+          return acc
+        }, {})
+      }
+
+      // Attach a `user` object to each comment to preserve existing UI
+      const enriched = commentsData.map(c => ({
+        ...c,
+        user: profilesMap[c.user_id] || null,
+      }))
+
+      setComments(enriched)
     } catch {
       setError('Failed to load comments')
     } finally {
@@ -41,19 +60,24 @@ export default function CommentSection({ bugId, session }) {
           filter: `bug_id=eq.${bugId}`,
         },
         async (payload) => {
-          const { data } = await supabase
+          const { data: comment } = await supabase
             .from('comments')
-            .select(`
-              *,
-              user:profiles!user_id(username)
-            `)
+            .select(`*`)
             .eq('id', payload.new.id)
             .single()
 
-          if (data) {
+          if (comment) {
+            // fetch profile for the commenter
+            const { data: [profile] = [] } = await supabase
+              .from('profiles')
+              .select('id, username, email, full_name')
+              .eq('id', comment.user_id)
+
+            const enriched = { ...comment, user: profile || null }
+
             setComments((prev) => {
-              if (prev.some((c) => c.id === data.id)) return prev
-              return [...prev, data]
+              if (prev.some((c) => c.id === enriched.id)) return prev
+              return [...prev, enriched]
             })
           }
         }
@@ -72,27 +96,32 @@ export default function CommentSection({ bugId, session }) {
     setError(null)
 
     try {
-      const { data, error: insertError } = await supabase
+      const { data: inserted, error: insertError } = await supabase
         .from('comments')
         .insert({
           bug_id: bugId,
           user_id: session.user.id,
           content: newComment.trim(),
         })
-        .select(`
-          *,
-          user:profiles!user_id(username)
-        `)
+        .select(`*`)
         .single()
 
       if (insertError) throw insertError
 
-      if (data) {
-        setComments([...comments, data])
+      if (inserted) {
+        // attach current user's profile for immediate UI
+        const { data: [profile] = [] } = await supabase
+          .from('profiles')
+          .select('id, username, email, full_name')
+          .eq('id', session.user.id)
+
+        const enriched = { ...inserted, user: profile || null }
+        setComments([...comments, enriched])
         setNewComment('')
         await supabase.from('bug_activity').insert({
           bug_id: bugId,
-          user_id: session.user.id,
+          actor_id: session.user.id,
+          actor_email: session.user.email,
           action: 'comment_added',
         })
       }

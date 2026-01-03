@@ -7,7 +7,6 @@ export default function Auth() {
   const [email, setEmail] = useState('')
   const [password, setPassword] = useState('')
   const [isSignUp, setIsSignUp] = useState(false)
-  const [isAdminSignUp, setIsAdminSignUp] = useState(false)
   const [isForgotPassword, setIsForgotPassword] = useState(false)
   const [showPassword, setShowPassword] = useState(false)
   const [error, setError] = useState(null)
@@ -110,24 +109,9 @@ export default function Auth() {
         }
 
         if (data.user) {
-          // PHASE 1: NEVER persist procedural avatar to database
-          // avatar_url must be null for new signups - procedural is view-only
-          const { error: profileError } = await supabase.from('profiles').insert({
-            id: data.user.id,
-            email: data.user.email,
-            username: email.split('@')[0],
-            role: isAdminSignUp ? 'admin' : 'user',
-            avatar_url: null,  // VERIFIED: procedural avatar NOT persisted
-          })
-
-          if (profileError) {
-            console.error('❌ PHASE 2 - PROFILE HEALING REMOVED: Failed to create profile row:', profileError)
-            throw new Error(`Database error: Failed to create profile. ${profileError.message}`)
-          }
-
-          setSuccess(`Account created as ${isAdminSignUp ? 'Admin' : 'User'}! You can now sign in.`)
+          // Profiles are created by DB trigger; do not insert from frontend.
+          setSuccess('Account created! You can now sign in.')
           setIsSignUp(false)
-          setIsAdminSignUp(false)
           setEmail('')
           setPassword('')
         }
@@ -388,24 +372,6 @@ export default function Auth() {
                   </div>
                 )}
               </div>
-
-              {isSignUp && (
-                <div className="flex items-start gap-3 p-4 bg-gradient-to-r from-slate-50 to-blue-50 rounded-xl border border-slate-200">
-                  <input
-                    type="checkbox"
-                    id="adminCheck"
-                    checked={isAdminSignUp}
-                    onChange={(e) => setIsAdminSignUp(e.target.checked)}
-                    className="w-5 h-5 mt-0.5 text-blue-600 border-slate-300 rounded-md focus:ring-blue-500 cursor-pointer"
-                  />
-                  <label htmlFor="adminCheck" className="cursor-pointer">
-                    <span className="text-sm font-semibold text-slate-700">Register as Admin</span>
-                    <p className="text-xs text-slate-500 mt-0.5">
-                      Admins can assign bugs and manage the team
-                    </p>
-                  </label>
-                </div>
-              )}
 
               <button
                 type="submit"
