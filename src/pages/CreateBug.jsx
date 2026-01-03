@@ -174,8 +174,11 @@ export default function CreateBug({ session }) {
         setSubmitting(false)
         return
       }
-      // PHASE 1 — STEP 1: Build full description
+      // PHASE 1 — STEP 1: Build full description (embed steps into description)
       let fullDescription = formData.description
+      if (formData.steps_to_reproduce && formData.steps_to_reproduce.trim()) {
+        fullDescription += `\n\n---\n\n**Steps to Reproduce:**\n\n${formData.steps_to_reproduce.trim()}`
+      }
       if (formData.expected_behavior || formData.actual_behavior) {
         fullDescription += '\n\n---'
         if (formData.expected_behavior) fullDescription += `\n\n**Expected:** ${formData.expected_behavior}`
@@ -191,7 +194,6 @@ export default function CreateBug({ session }) {
         .insert({
           title: formData.title,
           description: fullDescription,
-          steps_to_reproduce: formData.steps_to_reproduce,
           priority: formData.priority,
           status: 'Open',
           is_archived: false,

@@ -63,7 +63,7 @@ export function exportToJSON(bugs, filename = 'bugs-export') {
     description: bug.description,
     status: bug.status,
     priority: bug.priority,
-    steps_to_reproduce: bug.steps_to_reproduce,
+    steps_to_reproduce: bug.steps_to_reproduce || null,
     reporter: bug.reported_by_name || bug.reported_by_email || null,
     created_at: bug.created_at,
     updated_at: bug.updated_at,

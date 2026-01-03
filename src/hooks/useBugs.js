@@ -36,7 +36,13 @@ export function useBugs(options = {}) {
 
       const bugsWithImages = await Promise.all((data || []).map(async (bug) => {
         const preview = await getBugPreviewImage(bug.user_id, bug.id)
-        return { ...bug, preview_image: preview || null }
+        // Extract synthetic steps_to_reproduce from description if present
+        let steps = null
+        if (bug.description && bug.description.includes('\n\n---\n\n**Steps to Reproduce:**\n\n')) {
+          const parts = bug.description.split('\n\n---\n\n**Steps to Reproduce:**\n\n')
+          steps = parts[1]?.split('\n\n---')?.[0] || null
+        }
+        return { ...bug, preview_image: preview || null, steps_to_reproduce: steps }
       }))
 
       setBugs(bugsWithImages)
@@ -77,7 +83,12 @@ export function useBug(bugId) {
 
       if (fetchError) throw fetchError
       const preview = await getBugPreviewImage(data.user_id, data.id)
-      setBug({ ...data, preview_image: preview || null })
+      let steps = null
+      if (data.description && data.description.includes('\n\n---\n\n**Steps to Reproduce:**\n\n')) {
+        const parts = data.description.split('\n\n---\n\n**Steps to Reproduce:**\n\n')
+        steps = parts[1]?.split('\n\n---')?.[0] || null
+      }
+      setBug({ ...data, preview_image: preview || null, steps_to_reproduce: steps })
     } catch (err) {
       setError(err.message || 'Bug not found')
     } finally {
