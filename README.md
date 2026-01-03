@@ -22,13 +22,14 @@
 - 📊 **Analytics** - Real-time statistics, trends, and metrics
 - 🎨 **Multiple Views** - List, Kanban board, and timeline views
 - 👥 **Collaboration** - Comments, mentions, activity tracking
+- 🗂️ **Bug Actions** - Archive/restore/delete with activity logging
 - ⌨️ **Shortcuts** - Ctrl+K quick actions, extensive keyboard navigation
-- 📸 **File Management** - Drag-and-drop uploads, image preview
+- 📸 **File Management** - Storage-based image uploads with bugId paths
 - 🔑 **OAuth** - Google sign-in support with automatic profile creation
-- �️ **Avatar System** - Procedural geometric avatars + custom uploads (max 2MB)
+- 🖼️ **Avatar System** - Procedural geometric avatars + custom uploads (max 2MB)
 - 👤 **Profile Management** - Edit username, full name, and avatar
 - 🗑️ **Account Deletion** - Production-grade secure account removal
-- 🔐 **Security** - RLS policies, session management, HTTPS-ready
+- 🔐 **Security** - RLS policies, session management, HTTPS-ready, audit logging
 - 📱 **Responsive** - Mobile-first, touch-friendly, PWA-ready
 - 💾 **Real-time Sync** - Live updates with offline support
 
@@ -293,7 +294,7 @@ MIT License - see [LICENSE](LICENSE) for details.
 
 ---
 
-**Status**: ✅ Production Ready | **Version**: 1.0.0 | **Last Updated**: Jan 2, 2026
+**Status**: ✅ Production Ready | **Version**: 1.1.0 | **Last Updated**: Jan 3, 2026
 
 <div align="center">
 

@@ -21,7 +21,7 @@ if (typeof window !== 'undefined') {
   initWatermark()
 }
 
-function AuthenticatedApp({ session, userProfile }) {
+function AuthenticatedApp({ session, userProfile, isAdmin }) {
   const { bugs } = useBugs()
 
   return (
@@ -29,7 +29,7 @@ function AuthenticatedApp({ session, userProfile }) {
       <Navbar 
         session={session} 
         userProfile={userProfile} 
-        isAdmin={userProfile?.is_admin === true}
+        isAdmin={isAdmin}
       />
       <main className="min-h-[calc(100vh-56px)]">
         <Suspense fallback={<PageLoader />}>
@@ -39,7 +39,7 @@ function AuthenticatedApp({ session, userProfile }) {
             <Route path="/edit-profile" element={<EditProfile />} />
             <Route
               path="/bug/:id"
-              element={<BugDetail session={session} />}
+              element={<BugDetail session={session} isAdmin={isAdmin} />}
             />
             <Route path="*" element={<Navigate to="/" replace />} />
           </Routes>
