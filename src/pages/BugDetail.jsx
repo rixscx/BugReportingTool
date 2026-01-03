@@ -12,6 +12,7 @@ import StatusBadge from '../components/StatusBadge'
 import CommentSection from '../components/CommentSection'
 import ActivityTimeline from '../components/ActivityTimeline'
 import { formatSmartDate } from '../lib/dateUtils'
+import { DropdownMenu, DropdownMenuTrigger, DropdownMenuContent, DropdownMenuItem } from '../components/DropdownMenu'
 
 // Simple markdown renderer for bold text
 const renderMarkdown = (text) => {
@@ -132,11 +133,52 @@ export default function BugDetail({ session, isAdmin }) {
         .eq('id', id)
 
       if (archiveError) throw archiveError
+
+      // Log activity
+      await supabase.from('bug_activity').insert({
+        bug_id: id,
+        actor_id: session.user.id,
+        actor_email: session.user.email,
+        action: 'archived',
+        metadata: { previous_is_archived: false },
+      })
+
       showToast('Bug archived successfully', 'success')
       navigate('/')
     } catch {
       setError('Failed to archive bug')
       showToast('Failed to archive bug', 'error')
+    } finally {
+      setUpdating(false)
+    }
+  }
+
+  const restoreBug = async () => {
+    setUpdating(true)
+    setError(null)
+    
+    try {
+      const { error: restoreError } = await supabase
+        .from('bugs')
+        .update({ is_archived: false })
+        .eq('id', id)
+
+      if (restoreError) throw restoreError
+
+      // Log activity
+      await supabase.from('bug_activity').insert({
+        bug_id: id,
+        actor_id: session.user.id,
+        actor_email: session.user.email,
+        action: 'restored',
+        metadata: { previous_is_archived: true },
+      })
+
+      showToast('Bug restored successfully', 'success')
+      fetchBug()
+    } catch {
+      setError('Failed to restore bug')
+      showToast('Failed to restore bug', 'error')
     } finally {
       setUpdating(false)
     }
@@ -157,7 +199,16 @@ export default function BugDetail({ session, isAdmin }) {
     setError(null)
     
     try {
-      // DB/RLS AUDIT: Delete bug from database first
+      // Log activity BEFORE deletion
+      await supabase.from('bug_activity').insert({
+        bug_id: id,
+        actor_id: session.user.id,
+        actor_email: session.user.email,
+        action: 'deleted',
+        metadata: { deleted_at: new Date().toISOString() },
+      })
+
+      // DB/RLS AUDIT: Delete bug from database
       const { error: deleteError } = await supabase
         .from('bugs')
         .delete()
@@ -237,21 +288,75 @@ export default function BugDetail({ session, isAdmin }) {
         )}
         
         {/* Header */}
-        <div className="flex items-center gap-4 mb-6">
-          <button
-            onClick={() => navigate('/')}
-            className="p-2 text-slate-400 hover:text-slate-600 hover:bg-white rounded-lg transition-colors"
-          >
-            <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M15 19l-7-7 7-7" />
-            </svg>
-          </button>
-          <div className="flex items-center gap-2">
-            <span className="text-xs font-mono text-slate-400 bg-slate-100 px-2 py-1 rounded">
-              #{id.slice(0, 8)}
-            </span>
-            <CopyIconButton text={window.location.href} size="sm" title="Copy link" />
+        <div className="flex items-center justify-between gap-4 mb-6">
+          <div className="flex items-center gap-4">
+            <button
+              onClick={() => navigate('/')}
+              className="p-2 text-slate-400 hover:text-slate-600 hover:bg-white rounded-lg transition-colors"
+            >
+              <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M15 19l-7-7 7-7" />
+              </svg>
+            </button>
+            <div className="flex items-center gap-2">
+              <span className="text-xs font-mono text-slate-400 bg-slate-100 px-2 py-1 rounded">
+                #{id.slice(0, 8)}
+              </span>
+              <CopyIconButton text={window.location.href} size="sm" title="Copy link" />
+            </div>
           </div>
+          
+          {/* Actions Menu */}
+          <DropdownMenu>
+            {({ open, setOpen }) => (
+              <>
+                <DropdownMenuTrigger 
+                  onClick={() => setOpen(!open)}
+                  className="p-2 text-slate-400 hover:text-slate-600 hover:bg-white rounded-lg transition-colors"
+                >
+                  <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 5v.01M12 12v.01M12 19v.01M12 6a1 1 0 110-2 1 1 0 010 2zm0 7a1 1 0 110-2 1 1 0 010 2zm0 7a1 1 0 110-2 1 1 0 010 2z" />
+                  </svg>
+                </DropdownMenuTrigger>
+                <DropdownMenuContent open={open} align="end">
+                  {!bug.is_archived && (
+                    <DropdownMenuItem 
+                      onClick={() => { setOpen(false); archiveBug(); }} 
+                      disabled={updating}
+                      icon={<svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M5 8h14M5 8a2 2 0 110-4h14a2 2 0 110 4M5 8v10a2 2 0 002 2h10a2 2 0 002-2V8m-9 4h4" />
+                      </svg>}
+                    >
+                      Archive
+                    </DropdownMenuItem>
+                  )}
+                  {bug.is_archived && (
+                    <DropdownMenuItem 
+                      onClick={() => { setOpen(false); restoreBug(); }} 
+                      disabled={updating}
+                      icon={<svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M4 4v5h.582m15.356 2A8.001 8.001 0 004.582 9m0 0H9m11 11v-5h-.581m0 0a8.003 8.003 0 01-15.357-2m15.357 2H15" />
+                      </svg>}
+                    >
+                      Restore
+                    </DropdownMenuItem>
+                  )}
+                  {(session.user.id === bug.user_id || isAdmin) && (
+                    <DropdownMenuItem 
+                      onClick={() => { setOpen(false); deleteBug(); }} 
+                      disabled={updating}
+                      variant="danger"
+                      icon={<svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16" />
+                      </svg>}
+                    >
+                      Delete
+                    </DropdownMenuItem>
+                  )}
+                </DropdownMenuContent>
+              </>
+            )}
+          </DropdownMenu>
         </div>
 
         <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
