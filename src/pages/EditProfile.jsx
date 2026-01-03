@@ -381,9 +381,15 @@ export default function EditProfile() {
                   type="text"
                   value={fullName}
                   onChange={(e) => setFullName(e.target.value)}
-                  className="w-full px-4 py-3 bg-slate-50 border border-slate-200 rounded-xl focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent text-slate-800"
-                  placeholder="Your full name"
+                  disabled={isOAuthGoogle}
+                  className={`w-full px-4 py-3 border border-slate-200 rounded-xl focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent ${
+                    isOAuthGoogle ? 'bg-slate-100 text-slate-600 cursor-not-allowed' : 'bg-slate-50 text-slate-800'
+                  }`}
+                  placeholder={isOAuthGoogle ? 'Provided by Google' : 'Your full name'}
                 />
+                {isOAuthGoogle && (
+                  <p className="text-xs text-slate-500 mt-1">Full name is managed by your Google account</p>
+                )}
               </div>
 
               <div>

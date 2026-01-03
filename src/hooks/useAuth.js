@@ -145,8 +145,46 @@ export function useAuth() {
       }
 
       // INVARIANT ENFORCED: Profile must exist already (no healing/upserts on read)
+      // EXCEPTION: OAuth users may not have profiles yet - create on first login
       const noProfile = (!data && !error) || error?.code === 'PGRST116'
       if (noProfile) {
+        const provider = userMetadata?.provider || userMetadata?.iss || ''
+        const isGoogleProvider = typeof provider === 'string' && provider.toLowerCase().includes('google')
+        
+        // OAuth users: create profile on first login with provider metadata
+        if (isGoogleProvider) {
+          console.log('🔐 OAuth user without profile - creating from metadata:', userId)
+          
+          const fullNameFromProvider = userMetadata?.full_name || userMetadata?.name || null
+          const avatarUrlFromProvider = userMetadata?.avatar_url || null
+          
+          const { data: newProfile, error: insertError } = await supabase
+            .from('profiles')
+            .insert({
+              id: userId,
+              email: userEmail,
+              username: usernameFromEmail,
+              full_name: fullNameFromProvider,
+              avatar_url: avatarUrlFromProvider,
+              role: 'user',
+            })
+            .select()
+            .maybeSingle()
+          
+          if (insertError) {
+            console.error('❌ Failed to create OAuth profile:', insertError)
+            throw new Error(`Failed to create profile: ${insertError.message}`)
+          }
+          
+          if (newProfile) {
+            setUserProfile(newProfile)
+            setLoading(false)
+            fetchingRef.current = false
+            return
+          }
+        }
+        
+        // Non-OAuth users without profile is an error
         throw new Error('INVARIANT VIOLATION: profile missing for authenticated user')
       }
 

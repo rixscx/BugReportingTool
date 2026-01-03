@@ -79,6 +79,7 @@ export default function Auth() {
       })
       
       if (error) throw error
+      // Note: Profile creation happens in useAuth after OAuth callback via session listener
     } catch (err) {
       setError(err.message || 'Failed to sign in with Google')
       setLoading(false)
