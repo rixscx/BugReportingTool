@@ -264,11 +264,19 @@ export function useAuth() {
         persistProceduralSeed(userId, null)
         persistProceduralOverride(userId, false)
       } else {
-        // PROCEDURAL INVARIANT: Seed only comes from explicit generation; never auto-derive from user.id
+        // PROCEDURAL INVARIANT: Auto-generate seed for email users on first login (UI-only)
         const storedSeed = getStoredProceduralSeed(userId)
         const storedOverride = getStoredProceduralOverride(userId)
-        persistProceduralSeed(userId, storedSeed)
-        persistProceduralOverride(userId, storedOverride)
+        
+        // Auto-generate procedural avatar for email users if no seed exists
+        if (!storedSeed) {
+          const newSeed = `${userId}-${Date.now()}`
+          persistProceduralSeed(userId, newSeed)
+          persistProceduralOverride(userId, false) // Not forced, uploaded avatar takes precedence
+        } else {
+          persistProceduralSeed(userId, storedSeed)
+          persistProceduralOverride(userId, storedOverride)
+        }
       }
 
       return { isGoogleProvider }
