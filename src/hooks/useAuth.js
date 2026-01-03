@@ -1,6 +1,5 @@
 import { useState, useEffect, useCallback, useRef } from 'react'
 import { supabase } from '../lib/supabaseClient'
-import { generateAvatarUrl } from '../lib/avatarUtils'
 
 // AVATAR INVARIANTS (DO NOT BREAK):
 // - profiles.avatar_url stores ONLY provider or user-uploaded avatars
@@ -23,9 +22,90 @@ export function useAuth() {
   const [loading, setLoading] = useState(true)
   const fetchingRef = useRef(false)
   const lastFetchedUserIdRef = useRef(null)
+  const [proceduralAvatarOverride, setProceduralAvatarOverride] = useState(false)
+  const proceduralSeedRef = useRef(null)
+  const proceduralOverrideRef = useRef(false)
   
   // Shared procedural avatar seed (UI-only, not persisted)
   const [proceduralAvatarSeed, setProceduralAvatarSeed] = useState(null)
+
+  const getStoredProceduralSeed = useCallback((userId) => {
+    if (!userId) return null
+    try {
+      const stored = localStorage.getItem(`proceduralSeed:${userId}`)
+      return stored || null
+    } catch {
+      return null
+    }
+  }, [])
+
+  const emitProceduralState = useCallback((userId, seed, overrideValue) => {
+    if (!userId || typeof window === 'undefined') return
+    window.dispatchEvent(new CustomEvent('procedural-avatar-change', {
+      detail: { userId, seed, override: overrideValue }
+    }))
+  }, [])
+
+  const getStoredProceduralOverride = useCallback((userId) => {
+    if (!userId) return false
+    try {
+      const stored = localStorage.getItem(`proceduralOverride:${userId}`)
+      return stored === 'true'
+    } catch {
+      return false
+    }
+  }, [])
+
+  useEffect(() => {
+    const userId = session?.user?.id
+    if (!userId) return undefined
+
+    const handleProceduralChange = (event) => {
+      if (event.detail?.userId !== userId) return
+      if (typeof event.detail.seed !== 'undefined') {
+        setProceduralAvatarSeed(event.detail.seed)
+        proceduralSeedRef.current = event.detail.seed
+      }
+      if (typeof event.detail.override !== 'undefined') {
+        const nextOverride = !!event.detail.override
+        setProceduralAvatarOverride(nextOverride)
+        proceduralOverrideRef.current = nextOverride
+      }
+    }
+
+    window.addEventListener('procedural-avatar-change', handleProceduralChange)
+    return () => window.removeEventListener('procedural-avatar-change', handleProceduralChange)
+  }, [session?.user?.id])
+
+  const persistProceduralSeed = useCallback((userId, seed) => {
+    setProceduralAvatarSeed(seed)
+    proceduralSeedRef.current = seed
+    if (!userId) return
+    try {
+      if (seed === null) {
+        localStorage.removeItem(`proceduralSeed:${userId}`)
+      } else {
+        localStorage.setItem(`proceduralSeed:${userId}`, seed)
+      }
+      emitProceduralState(userId, seed, proceduralOverrideRef.current)
+    } catch {
+    }
+  }, [emitProceduralState])
+
+  const persistProceduralOverride = useCallback((userId, overrideValue) => {
+    setProceduralAvatarOverride(!!overrideValue)
+    proceduralOverrideRef.current = !!overrideValue
+    if (!userId) return
+    try {
+      if (overrideValue) {
+        localStorage.setItem(`proceduralOverride:${userId}`, 'true')
+      } else {
+        localStorage.removeItem(`proceduralOverride:${userId}`)
+      }
+      emitProceduralState(userId, proceduralSeedRef.current, !!overrideValue)
+    } catch {
+    }
+  }, [emitProceduralState])
 
   const fetchUserProfile = useCallback(async (userId, userEmail, userMetadata) => {
     // PHASE 3 — OAUTH FIX: Guard against undefined/null userId before any DB queries
@@ -91,9 +171,13 @@ export function useAuth() {
       let profileData = data
 
       if (isGoogleProvider && !data.avatar_url && userMetadata?.avatar_url) {
+        const fullNameFromProvider = userMetadata.full_name || userMetadata.name || null
         const { data: updatedProfile, error: avatarUpdateError } = await supabase
           .from('profiles')
-          .update({ avatar_url: userMetadata.avatar_url })
+          .update({
+            avatar_url: userMetadata.avatar_url,
+            full_name: fullNameFromProvider ?? data.full_name ?? null,
+          })
           .eq('id', userId)
           .select()
           .maybeSingle()
@@ -127,6 +211,31 @@ export function useAuth() {
   useEffect(() => {
     let isMounted = true
     
+    const primeProceduralState = (session) => {
+      const userId = session?.user?.id
+      const provider = session?.user?.app_metadata?.provider || session?.user?.user_metadata?.provider || session?.user?.user_metadata?.iss || ''
+      const isGoogleProvider = typeof provider === 'string' && provider.toLowerCase().includes('google')
+
+      if (!userId) {
+        persistProceduralSeed(null, null)
+        persistProceduralOverride(null, false)
+        return { isGoogleProvider }
+      }
+
+      if (isGoogleProvider) {
+        persistProceduralSeed(userId, null)
+        persistProceduralOverride(userId, false)
+      } else {
+        const storedSeed = getStoredProceduralSeed(userId)
+        const seedToUse = storedSeed || userId
+        persistProceduralSeed(userId, seedToUse)
+        const storedOverride = getStoredProceduralOverride(userId)
+        persistProceduralOverride(userId, storedOverride)
+      }
+
+      return { isGoogleProvider }
+    }
+    
     // PHASE 3 — AUTH RACE FIX: Get initial session and wait for it to be stable
     supabase.auth.getSession().then(({ data: { session }, error }) => {
       if (!isMounted) return
@@ -141,20 +250,12 @@ export function useAuth() {
       setSession(session)
       
       if (session?.user?.id) {
-        const provider = session.user.app_metadata?.provider || session.user.user_metadata?.provider || session.user.user_metadata?.iss || ''
-        const isGoogleProvider = typeof provider === 'string' && provider.toLowerCase().includes('google')
+        primeProceduralState(session)
         // PHASE 3 — OAUTH FIX: Validate session has required fields before profile fetch
         if (!session.user.email) {
           console.warn('⚠️ PHASE 3 — OAUTH FIX: Session missing email, using id as fallback')
         }
 
-        // Procedural avatars only for non-OAuth users
-        if (!isGoogleProvider) {
-          setProceduralAvatarSeed(session.user.id)
-        } else {
-          setProceduralAvatarSeed(null)
-        }
-        
         // PHASE 3 — AUTH RACE FIX: Fetch profile only after session is confirmed stable
         fetchUserProfile(session.user.id, session.user.email, session.user.user_metadata)
       } else {
@@ -173,18 +274,10 @@ export function useAuth() {
         setSession(session)
         
         if (session?.user?.id) {
-          const provider = session.user.app_metadata?.provider || session.user.user_metadata?.provider || session.user.user_metadata?.iss || ''
-          const isGoogleProvider = typeof provider === 'string' && provider.toLowerCase().includes('google')
+          primeProceduralState(session)
           // PHASE 3 — AUTH RACE FIX: Validate session before processing
           if (!session.user.email && event !== 'TOKEN_REFRESHED') {
             console.warn('⚠️ PHASE 3 — OAUTH FIX: Session missing email on event:', event)
-          }
-          
-          // Procedural avatars only for non-OAuth users
-          if (!isGoogleProvider) {
-            setProceduralAvatarSeed(session.user.id)
-          } else {
-            setProceduralAvatarSeed(null)
           }
           
           // PHASE 3 — PERF POLISH: Only fetch profile on SIGNED_IN or INITIAL_SESSION
@@ -195,7 +288,8 @@ export function useAuth() {
         } else {
           // PHASE 2 — PROCEDURAL AVATAR FIX: Clear seed on logout to prevent leakage
           setUserProfile(null)
-          setProceduralAvatarSeed(null)
+          persistProceduralSeed(null, null)
+          persistProceduralOverride(null, false)
           lastFetchedUserIdRef.current = null // PHASE 3 — AUTH RACE FIX: Clear fetch tracking
           setLoading(false)
         }
@@ -206,17 +300,18 @@ export function useAuth() {
       isMounted = false
       subscription.unsubscribe()
     }
-  }, [fetchUserProfile])
+  }, [fetchUserProfile, getStoredProceduralOverride, getStoredProceduralSeed, persistProceduralOverride, persistProceduralSeed])
 
   // AUTH HARDENING: Clear all state on logout
   const signOut = useCallback(async () => {
     // Clear profile state BEFORE signout to prevent stale data
     setUserProfile(null)
-    setProceduralAvatarSeed(null)
+    persistProceduralSeed(null, null)
+    persistProceduralOverride(null, false)
     lastFetchedUserIdRef.current = null
     fetchingRef.current = false
     await supabase.auth.signOut()
-  }, [])
+  }, [persistProceduralOverride, persistProceduralSeed])
 
   const deleteAccount = useCallback(async () => {
     if (!session?.user?.id) throw new Error('No user session')
@@ -257,6 +352,19 @@ export function useAuth() {
     }
   }, [session])
 
+  const updateProceduralSeed = useCallback((seed, { preferProcedural = true } = {}) => {
+    if (!session?.user?.id) return
+    persistProceduralSeed(session.user.id, seed)
+    if (preferProcedural) {
+      persistProceduralOverride(session.user.id, true)
+    }
+  }, [persistProceduralOverride, persistProceduralSeed, session?.user?.id])
+
+  const updateProceduralOverride = useCallback((overrideValue) => {
+    if (!session?.user?.id) return
+    persistProceduralOverride(session.user.id, overrideValue)
+  }, [persistProceduralOverride, session?.user?.id])
+
   const isAdmin = userProfile?.role === 'admin'
   const isAuthenticated = !!session
   const isTestAccount = session?.user?.email?.includes('test.')
@@ -269,7 +377,9 @@ export function useAuth() {
     isAuthenticated,
     isTestAccount,
     proceduralAvatarSeed,
-    setProceduralAvatarSeed,
+    setProceduralAvatarSeed: updateProceduralSeed,
+    proceduralAvatarOverride,
+    setProceduralAvatarOverride: updateProceduralOverride,
     signOut,
     deleteAccount,
     refetchProfile: async () => {

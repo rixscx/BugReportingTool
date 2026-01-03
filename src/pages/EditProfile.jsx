@@ -1,7 +1,7 @@
 import { useState, useEffect, useMemo } from 'react'
 import { useNavigate } from 'react-router-dom'
 import { supabase } from '../lib/supabaseClient'
-import { generateAvatarUrl } from '../lib/avatarUtils'
+import { generateAvatarUrl, resolveAvatar } from '../lib/avatarUtils'
 import { useToast } from '../components/Toast'
 import { useAuth } from '../hooks/useAuth'
 import { AvatarCropper } from '../components/AvatarCropper'
@@ -10,7 +10,7 @@ export default function EditProfile() {
   const navigate = useNavigate()
   const { showToast } = useToast()
   // PHASE 2 — PROCEDURAL AVATAR FIX: Get seed from single source of truth (useAuth)
-  const { userProfile, session, refetchProfile, proceduralAvatarSeed, setProceduralAvatarSeed, loading: profileLoading } = useAuth()
+  const { userProfile, session, refetchProfile, proceduralAvatarSeed, setProceduralAvatarSeed, proceduralAvatarOverride, setProceduralAvatarOverride, loading: profileLoading } = useAuth()
   const provider = session?.user?.app_metadata?.provider || session?.user?.user_metadata?.provider || session?.user?.user_metadata?.iss || ''
   const isOAuthGoogle = typeof provider === 'string' && provider.toLowerCase().includes('google')
   
@@ -25,10 +25,12 @@ export default function EditProfile() {
   
   // PHASE 2 — PROCEDURAL AVATAR FIX: Memoize procedural avatar with [proceduralAvatarSeed] dependency
   // This ensures avatar updates instantly when "Generate New Avatar" is clicked
-  const proceduralAvatarUrl = useMemo(() => {
-    if (!proceduralAvatarSeed) return null
-    return generateAvatarUrl(proceduralAvatarSeed)
-  }, [proceduralAvatarSeed])
+  const resolvedAvatar = useMemo(() => resolveAvatar({
+    oauthAvatarUrl: isOAuthGoogle ? session?.user?.user_metadata?.avatar_url || null : null,
+    uploadedAvatarUrl: userProfile?.avatar_url || null,
+    proceduralSeed: isOAuthGoogle ? null : proceduralAvatarSeed,
+    forceProcedural: !isOAuthGoogle && proceduralAvatarOverride,
+  }), [isOAuthGoogle, session?.user?.user_metadata?.avatar_url, userProfile?.avatar_url, proceduralAvatarSeed, proceduralAvatarOverride])
 
   // PHASE 2 — PROCEDURAL AVATAR FIX: Load profile data with render gating
   useEffect(() => {
@@ -39,16 +41,12 @@ export default function EditProfile() {
       setUsername(userProfile.username || (session?.user?.email?.split('@')[0] || ''))
       setFullName(userProfile.full_name || '')
       
-      // PHASE 2: Use uploaded avatar if exists, otherwise use memoized procedural
-      // Only set avatar if no custom file is being uploaded
+      // Only set preview when not editing; prefer resolver output
       if (!avatarFile) {
-        setAvatarUrl(userProfile.avatar_url || proceduralAvatarUrl || '')
+        setAvatarUrl(resolvedAvatar || '')
       }
-    } else if (proceduralAvatarUrl && !avatarFile) {
-      // If profile hasn't loaded yet, use memoized procedural avatar
-      setAvatarUrl(proceduralAvatarUrl)
     }
-  }, [userProfile, session?.user?.email, proceduralAvatarUrl, profileLoading, avatarFile])
+  }, [userProfile, session?.user?.email, resolvedAvatar, profileLoading, avatarFile])
 
   const handleAvatarUpload = (e) => {
     const file = e.target.files?.[0]
@@ -72,6 +70,7 @@ export default function EditProfile() {
       // Store raw file and open cropper
       setRawImageFile(file)
       setShowCropper(true)
+      setProceduralAvatarOverride(false)
     }
     
     // Reset file input so same file can be selected again
@@ -86,6 +85,7 @@ export default function EditProfile() {
     // Convert blob to file for upload
     const croppedFile = new File([croppedBlob], 'avatar.png', { type: 'image/png' })
     setAvatarFile(croppedFile)
+    setProceduralAvatarOverride(false)
     
     // Preview the cropped image
     const reader = new FileReader()
@@ -110,8 +110,11 @@ export default function EditProfile() {
   const handleRemoveAvatar = () => {
     setAvatarFile(null)
     // PHASE 2 — PROCEDURAL AVATAR FIX: Use memoized procedural avatar
-    if (proceduralAvatarUrl) {
-      setAvatarUrl(proceduralAvatarUrl)
+    if (!isOAuthGoogle) {
+      setProceduralAvatarOverride(true)
+      if (proceduralAvatarSeed) {
+        setAvatarUrl(generateAvatarUrl(proceduralAvatarSeed))
+      }
     }
   }
 
@@ -129,14 +132,14 @@ export default function EditProfile() {
     // Generate new seed: userId + timestamp for randomness
     const newSeed = `${session.user.id}-${Date.now()}`
     
-    // Update shared seed - this triggers useMemo recalculation
+    // Update shared seed - this triggers useMemo recalculation and forces procedural to display
     setProceduralAvatarSeed(newSeed)
+    setProceduralAvatarOverride(true)
     
-    // Clear any uploaded file since user wants procedural avatar
+    // Clear uploaded file preview so procedural can display
     setAvatarFile(null)
     
-    // Immediately update local avatar state with new procedural avatar
-    // This ensures instant UI update without waiting for useEffect
+    // Immediately update local avatar state with new procedural avatar (preview only, never persisted)
     const newAvatarUrl = generateAvatarUrl(newSeed)
     setAvatarUrl(newAvatarUrl)
   }
@@ -185,13 +188,19 @@ export default function EditProfile() {
 
         // Cache-bust to show new avatar immediately
         finalAvatarUrl = `${urlData.publicUrl}?t=${Date.now()}`
+
+        // Uploaded avatar takes precedence over procedural
+        setProceduralAvatarOverride(false)
       }
 
       // Prepare update data (don't include id or email - they're immutable)
       const updateData = {
         username,
         full_name: fullName,
-        avatar_url: finalAvatarUrl,
+      }
+
+      if (avatarFile) {
+        updateData.avatar_url = finalAvatarUrl
       }
 
       const { error: updateError, data: updatedProfile } = await supabase
@@ -278,6 +287,15 @@ export default function EditProfile() {
                       console.error('Avatar failed to load:', e.message)
                     }}
                   />
+                ) : resolvedAvatar ? (
+                  <img
+                    src={resolvedAvatar}
+                    alt="Avatar Preview"
+                    className="w-32 h-32 rounded-2xl border-4 border-slate-200 shadow-lg object-cover bg-white"
+                    onError={(e) => {
+                      console.error('Avatar failed to load:', e.message)
+                    }}
+                  />
                 ) : (
                   <div className="w-32 h-32 rounded-2xl border-4 border-slate-200 shadow-lg bg-gradient-to-br from-slate-100 to-slate-200 flex items-center justify-center">
                     <svg className="w-12 h-12 text-slate-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
@@ -321,7 +339,7 @@ export default function EditProfile() {
               </label>
               
               {/* Generate new procedural avatar button (UI-only) */}
-              {!avatarFile && profileLoading === false && !isOAuthGoogle && (
+              {profileLoading === false && !isOAuthGoogle && (
                 <button
                   type="button"
                   onClick={handleGenerateNewAvatar}

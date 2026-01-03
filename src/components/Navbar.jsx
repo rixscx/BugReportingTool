@@ -1,7 +1,7 @@
 import { useState, useEffect, useCallback, useMemo } from 'react'
 import { Link, useLocation, useNavigate } from 'react-router-dom'
 import { supabase } from '../lib/supabaseClient'
-import { generateAvatarUrl } from '../lib/avatarUtils'
+import { resolveAvatar } from '../lib/avatarUtils'
 import { useAuth } from '../hooks/useAuth'
 import { useToast } from './Toast'
 import { ConfirmDialog, useConfirmDialog } from './ConfirmDialog'
@@ -12,17 +12,24 @@ export default function Navbar({ session, userProfile, isAdmin }) {
   const navigate = useNavigate()
   const { showToast } = useToast()
   // PHASE 2 — PROCEDURAL AVATAR FIX: Get seed from single source of truth (useAuth)
-  const { isTestAccount, deleteAccount, proceduralAvatarSeed, loading: profileLoading = false } = useAuth()
+  const { isTestAccount, deleteAccount, proceduralAvatarSeed, proceduralAvatarOverride, loading: profileLoading = false } = useAuth()
   const deleteDialog = useConfirmDialog()
   const [showShortcutsHelp, setShowShortcutsHelp] = useState(false)
   const [showUserMenu, setShowUserMenu] = useState(false)
   
   // PHASE 2 — PROCEDURAL AVATAR FIX: Memoize avatar URL with [proceduralAvatarSeed] dependency
   // This ensures avatar changes when seed changes (e.g., "Generate New Avatar" clicked)
-  const proceduralAvatarUrl = useMemo(() => {
-    if (!proceduralAvatarSeed) return null
-    return generateAvatarUrl(proceduralAvatarSeed)
-  }, [proceduralAvatarSeed])
+  const provider = session?.user?.app_metadata?.provider || session?.user?.user_metadata?.provider || session?.user?.user_metadata?.iss || ''
+  const isOAuthUser = typeof provider === 'string' && provider.toLowerCase().includes('google')
+  const providerAvatarUrl = session?.user?.user_metadata?.avatar_url || null
+  const uploadedAvatarUrl = userProfile?.avatar_url || null
+
+  const resolvedAvatar = useMemo(() => resolveAvatar({
+    oauthAvatarUrl: isOAuthUser ? providerAvatarUrl : null,
+    uploadedAvatarUrl,
+    proceduralSeed: isOAuthUser ? null : proceduralAvatarSeed,
+    forceProcedural: !isOAuthUser && proceduralAvatarOverride,
+  }), [isOAuthUser, providerAvatarUrl, uploadedAvatarUrl, proceduralAvatarSeed, proceduralAvatarOverride])
 
   useEffect(() => {
     const handleOpenShortcuts = () => setShowShortcutsHelp(true)
@@ -189,16 +196,9 @@ export default function Navbar({ session, userProfile, isAdmin }) {
                   {/* PHASE 2 — PROCEDURAL AVATAR FIX: Render gating to prevent flicker */}
                   {profileLoading ? (
                     <div className="w-9 h-9 rounded-xl bg-slate-200 animate-pulse" />
-                  ) : userProfile?.avatar_url ? (
+                  ) : resolvedAvatar ? (
                     <img 
-                      src={userProfile.avatar_url} 
-                      alt={userProfile.username}
-                      className="w-9 h-9 rounded-xl ring-2 ring-white shadow-md"
-                      loading="lazy"
-                    />
-                  ) : proceduralAvatarUrl ? (
-                    <img 
-                      src={proceduralAvatarUrl}
+                      src={resolvedAvatar}
                       alt={userProfile?.username || 'User'}
                       className="w-9 h-9 rounded-xl ring-2 ring-white shadow-md"
                       loading="lazy"
@@ -217,16 +217,9 @@ export default function Navbar({ session, userProfile, isAdmin }) {
                       {/* PHASE 2 — PROCEDURAL AVATAR FIX: Render gating to prevent flicker */}
                       {profileLoading ? (
                         <div className="w-10 h-10 rounded-lg bg-slate-200 animate-pulse" />
-                      ) : userProfile?.avatar_url ? (
+                      ) : resolvedAvatar ? (
                         <img 
-                          src={userProfile.avatar_url} 
-                          alt={userProfile.username}
-                          className="w-10 h-10 rounded-lg ring-1 ring-slate-200"
-                          loading="lazy"
-                        />
-                      ) : proceduralAvatarUrl ? (
-                        <img 
-                          src={proceduralAvatarUrl}
+                          src={resolvedAvatar}
                           alt={userProfile?.username || 'User'}
                           className="w-10 h-10 rounded-lg ring-1 ring-slate-200"
                           loading="lazy"

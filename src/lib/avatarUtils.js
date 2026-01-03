@@ -40,13 +40,20 @@ export const generateAvatarWithStyle = (seed, style = 'geometric') => {
  * 4) Otherwise null (render placeholder)
  */
 export const resolveAvatar = ({
-  isOAuthUser,
-  providerAvatarUrl,
+  oauthAvatarUrl,
   uploadedAvatarUrl,
-  proceduralAvatarUrl,
+  proceduralSeed,
+  forceProcedural = false,
 }) => {
-  if (isOAuthUser && providerAvatarUrl) return providerAvatarUrl
-  if (uploadedAvatarUrl) return uploadedAvatarUrl
-  if (!isOAuthUser && proceduralAvatarUrl) return proceduralAvatarUrl
+  if (oauthAvatarUrl) return oauthAvatarUrl
+
+  if (forceProcedural && proceduralSeed) {
+    return generateAvatarUrl(proceduralSeed)
+  }
+
+  if (uploadedAvatarUrl && !forceProcedural) return uploadedAvatarUrl
+
+  if (proceduralSeed) return generateAvatarUrl(proceduralSeed)
+
   return null
 }
