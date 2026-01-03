@@ -143,11 +143,10 @@ export default function CreateBug({ session }) {
    * PHASE 1 — ATOMIC BUG SUBMISSION
    * 
    * INVARIANTS:
-   * 1. If image upload fails → bug is NOT created (no orphan DB rows)
+   * 1. If image upload fails → bug creation is rolled back (no orphan DB rows)
    * 2. If bug insert fails → submission fails loudly (no silent errors)
-   * 3. image_url is ALWAYS string or null (never undefined/empty)
-   * 4. Form state only resets after FULL success
-   * 5. Double submission is prevented via submitting state
+   * 3. Form state only resets after FULL success
+   * 4. Double submission is prevented via submitting state
    */
   const handleSubmit = async (e) => {
     e.preventDefault()
@@ -162,8 +161,8 @@ export default function CreateBug({ session }) {
     setLoading(true)
     setError(null)
 
-    // PHASE 1: Declare imageUrl outside try block for proper scoping
-    let imageUrl = null
+    // PHASE 1: Track created bugId for rollback if storage upload fails
+    let createdBugId = null
 
     try {
       // Ensure profile is available before any DB or storage operations
@@ -175,28 +174,7 @@ export default function CreateBug({ session }) {
         setSubmitting(false)
         return
       }
-      // PHASE 1 — STEP 1: Upload image FIRST (if present)
-      // If this fails, we abort BEFORE creating any DB row
-      if (imageFile) {
-        // Validate userProfile exists before attempting upload
-        if (!userProfile) {
-          throw new Error('User profile not loaded. Please refresh and try again.')
-        }
-        
-        // Upload image - if this throws, no bug row is created
-        imageUrl = await uploadBugImage(imageFile, formData.title, {
-          full_name: userProfile.full_name,
-          username: userProfile.username,
-          email: session?.user?.email
-        })
-        
-        // PHASE 1: Validate imageUrl is a valid string
-        if (typeof imageUrl !== 'string' || imageUrl.trim().length === 0) {
-          throw new Error('Image upload returned invalid URL')
-        }
-      }
-
-      // PHASE 1 — STEP 2: Build full description
+      // PHASE 1 — STEP 1: Build full description
       let fullDescription = formData.description
       if (formData.expected_behavior || formData.actual_behavior) {
         fullDescription += '\n\n---'
@@ -207,21 +185,22 @@ export default function CreateBug({ session }) {
         fullDescription += `\n\n**Environment:** ${formData.browser} / ${formData.os}${formData.version ? ` / v${formData.version}` : ''}`
       }
 
-      // PHASE 1 — STEP 3: Insert bug ONLY after successful image upload
-      // image_url is normalized to null if not set (never undefined)
-      // SCHEMA: Add snapshot fields for display
-      const { error: insertError } = await supabase.from('bugs').insert({
-        title: formData.title,
-        description: fullDescription,
-        steps_to_reproduce: formData.steps_to_reproduce,
-        priority: formData.priority,
-        status: 'Open',
-        is_archived: false,
-        image_url: imageUrl ?? null, // PHASE 1: ALWAYS string or null
-        user_id: session.user.id, // RLS: user_id matches auth.uid()
-        reported_by_email: session.user.email,
-        reported_by_name: userProfile?.full_name || userProfile?.username || null,
-      })
+      // PHASE 1 — STEP 2: Insert bug metadata first
+      const { data: inserted, error: insertError } = await supabase
+        .from('bugs')
+        .insert({
+          title: formData.title,
+          description: fullDescription,
+          steps_to_reproduce: formData.steps_to_reproduce,
+          priority: formData.priority,
+          status: 'Open',
+          is_archived: false,
+          user_id: session.user.id, // RLS: user_id matches auth.uid()
+          reported_by_email: session.user.email,
+          reported_by_name: userProfile?.full_name || userProfile?.username || null,
+        })
+        .select('id, user_id')
+        .single()
 
       // PHASE 1: Fail loudly on database errors
       if (insertError) {
@@ -233,6 +212,22 @@ export default function CreateBug({ session }) {
         })
         throw new Error(`Database error: ${insertError.message}`)
       }
+      createdBugId = inserted?.id || null
+      
+      // PHASE 1 — STEP 3: Upload image (storage only) using bugId
+      if (imageFile && createdBugId) {
+        try {
+          await uploadBugImage(imageFile, createdBugId, formData.title, {
+            full_name: userProfile.full_name,
+            username: userProfile.username,
+            email: session?.user?.email
+          })
+        } catch (uploadErr) {
+          // Roll back created bug to preserve previous invariant
+          await supabase.from('bugs').delete().eq('id', createdBugId)
+          throw uploadErr
+        }
+      }
       
       // PHASE 1 — SUCCESS: Only show success and navigate after FULL completion
       showToast('Bug report submitted!', 'success')
@@ -243,7 +238,7 @@ export default function CreateBug({ session }) {
       console.error('❌ PHASE 1 — ATOMIC BUG SUBMISSION FAILED:', {
         error: err,
         message: err.message,
-        imageWasUploaded: imageUrl !== null,
+        bugId: createdBugId,
         formTitle: formData.title
       })
       

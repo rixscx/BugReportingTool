@@ -1,6 +1,6 @@
 import { useState, useEffect, useCallback } from 'react'
 import { supabase } from '../lib/supabaseClient'
-import { deleteBugImage } from '../lib/bugImageStorage'
+import { deleteBugImages, getBugPreviewImage } from '../lib/bugImageStorage'
 
 /**
  * Custom hook for fetching and managing bugs
@@ -33,7 +33,13 @@ export function useBugs(options = {}) {
       const { data, error: fetchError } = await query
 
       if (fetchError) throw fetchError
-      setBugs(data || [])
+
+      const bugsWithImages = await Promise.all((data || []).map(async (bug) => {
+        const preview = await getBugPreviewImage(bug.user_id, bug.id)
+        return { ...bug, preview_image: preview || null }
+      }))
+
+      setBugs(bugsWithImages)
     } catch (err) {
       setError(err.message || 'Failed to load bugs')
     } finally {
@@ -70,7 +76,8 @@ export function useBug(bugId) {
         .single()
 
       if (fetchError) throw fetchError
-      setBug(data)
+      const preview = await getBugPreviewImage(data.user_id, data.id)
+      setBug({ ...data, preview_image: preview || null })
     } catch (err) {
       setError(err.message || 'Bug not found')
     } finally {
@@ -172,7 +179,7 @@ export function useBugMutations() {
   }, [])
 
   // STORAGE LIFECYCLE: Delete bug with associated image cleanup
-  const deleteBug = useCallback(async (bugId, imageUrl = null) => {
+  const deleteBug = useCallback(async (bugId, ownerId = null) => {
     setLoading(true)
     setError(null)
 
@@ -193,13 +200,11 @@ export function useBugMutations() {
         throw deleteError
       }
       
-      // STORAGE LIFECYCLE: Clean up bug image AFTER successful DB delete
-      if (imageUrl) {
-        const cleanupResult = await deleteBugImage(imageUrl)
-        if (!cleanupResult.success) {
-          // Log but don't fail - bug is already deleted
-          console.error('⚠️ STORAGE LIFECYCLE: Bug image cleanup failed (non-fatal):', cleanupResult.error)
-        }
+      // STORAGE LIFECYCLE: Clean up bug images AFTER successful DB delete
+      const cleanupResult = await deleteBugImages(ownerId, bugId)
+      if (!cleanupResult.success) {
+        // Log but don't fail - bug is already deleted
+        console.error('⚠️ STORAGE LIFECYCLE: Bug image cleanup failed (non-fatal):', cleanupResult.error)
       }
       
       return { success: true }

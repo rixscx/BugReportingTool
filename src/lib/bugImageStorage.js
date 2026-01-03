@@ -11,7 +11,7 @@
  * PHASE 3 — BUG IMAGE LIFECYCLE:
  * - Images are uploaded with upsert: true (replaces if exists)
  * - Old images are automatically replaced when bug image is updated
- * - Images are explicitly deleted when bug is deleted (see deleteBugImage)
+ * - Images are explicitly deleted when bug is deleted (see deleteBugImages)
  * - Filename format ensures uniqueness per bug: {title}-{reporter}.png
  * 
  * This module is FORBIDDEN from being used for avatar operations.
@@ -22,6 +22,18 @@ import { supabase } from './supabaseClient'
 
 // STORAGE ISOLATION INVARIANT: Hardcoded bucket name - NEVER parameterize
 const BUG_IMAGES_BUCKET = 'Bug images'
+const BUG_IMAGE_ROOT = 'bugs'
+
+const buildObjectPath = (ownerId, bugId, fileName) => `${BUG_IMAGE_ROOT}/${ownerId}/${bugId}/${fileName}`
+
+const getCurrentUserId = async () => {
+  const { data: userData, error: userError } = await supabase.auth.getUser()
+  const userId = userData?.user?.id || null
+  if (userError || !userId) {
+    throw new Error('INVARIANT VIOLATION: Unable to resolve authenticated user for storage path')
+  }
+  return userId
+}
 
 /**
  * Upload a bug image to Supabase Storage "Bug images" bucket
@@ -35,10 +47,13 @@ const BUG_IMAGES_BUCKET = 'Bug images'
  * @returns {Promise<string>} The public URL of the uploaded image
  * @throws {Error} If upload fails, validation fails, or invariants violated
  */
-export async function uploadBugImage(imageFile, bugTitle, reporter) {
+export async function uploadBugImage(imageFile, bugId, bugTitle, reporter) {
   // STORAGE ISOLATION INVARIANT: Validate ALL required parameters
   if (!imageFile) {
     throw new Error('INVARIANT VIOLATION: imageFile is required for bug image upload')
+  }
+  if (!bugId || typeof bugId !== 'string') {
+    throw new Error('INVARIANT VIOLATION: bugId is required for bug image upload')
   }
   
   if (!bugTitle || typeof bugTitle !== 'string' || bugTitle.trim().length === 0) {
@@ -83,12 +98,8 @@ export async function uploadBugImage(imageFile, bugTitle, reporter) {
   const fileName = `${sanitizedTitle}-${sanitizedReporter}.png`
 
   // RLS COMPLIANCE: Object path must be prefixed with auth.uid()
-  const { data: userData, error: userError } = await supabase.auth.getUser()
-  const userId = userData?.user?.id || null
-  if (userError || !userId) {
-    throw new Error('INVARIANT VIOLATION: Unable to resolve authenticated user for storage path')
-  }
-  const objectPath = `${userId}/${fileName}`
+  const userId = await getCurrentUserId()
+  const objectPath = buildObjectPath(userId, bugId, fileName)
   
   // STORAGE ISOLATION INVARIANT: Upload to hardcoded bucket ONLY
   const { error: uploadError } = await supabase.storage
@@ -129,55 +140,61 @@ export async function uploadBugImage(imageFile, bugTitle, reporter) {
   return data.signedUrl
 }
 
-/**
- * STORAGE LIFECYCLE: Delete a bug image from Supabase Storage
- * Called when a bug is deleted to clean up associated images
- * 
- * INVARIANT: This function is ONLY for "Bug images" bucket
- * MUST NOT be used for avatar cleanup (avatars are user-controlled)
- * 
- * @param {string} imageUrl - The public URL of the image to delete
- * @returns {Promise<{success: boolean, error?: string}>}
- */
-export async function deleteBugImage(imageUrl) {
-  // STORAGE ISOLATION INVARIANT: Only process Bug images bucket URLs
-  if (!imageUrl || typeof imageUrl !== 'string') {
-    return { success: true } // No image to delete
-  }
-  
-  // INVARIANT: Verify this is a Bug images bucket URL, not avatars
-  if (!imageUrl.includes('Bug%20images') && !imageUrl.includes('Bug images')) {
-    console.error('❌ STORAGE ISOLATION: Attempted to delete non-bug-image:', imageUrl)
-    throw new Error('INVARIANT VIOLATION: deleteBugImage called with non-bug-image URL')
-  }
-  
+export async function listBugImages(ownerId, bugId) {
+  if (!ownerId || !bugId) return []
+  const prefix = `${BUG_IMAGE_ROOT}/${ownerId}/${bugId}`
+
+  const { data: files, error } = await supabase.storage
+    .from(BUG_IMAGES_BUCKET)
+    .list(prefix, { limit: 20 })
+
+  if (error || !files || files.length === 0) return []
+
+  const signed = await Promise.all(files.map(async (file) => {
+    const { data: signedUrlData, error: urlError } = await supabase.storage
+      .from(BUG_IMAGES_BUCKET)
+      .createSignedUrl(`${prefix}/${file.name}`, 31536000)
+    if (urlError || !signedUrlData?.signedUrl) return null
+    return signedUrlData.signedUrl
+  }))
+
+  return signed.filter(Boolean)
+}
+
+export async function getBugPreviewImage(ownerId, bugId) {
+  const images = await listBugImages(ownerId, bugId)
+  return images[0] || null
+}
+
+export async function deleteBugImages(ownerId, bugId) {
+  if (!ownerId || !bugId) return { success: true }
+  const prefix = `${BUG_IMAGE_ROOT}/${ownerId}/${bugId}`
   try {
-    // Extract filename from URL
-    const urlParts = imageUrl.split('/')
-    const fileName = decodeURIComponent(urlParts[urlParts.length - 1])
-    
-    if (!fileName) {
-      return { success: true } // No valid filename
+    const { data: files, error: listError } = await supabase.storage
+      .from(BUG_IMAGES_BUCKET)
+      .list(prefix, { limit: 50 })
+
+    if (listError || !files || files.length === 0) {
+      return { success: true }
     }
-    
-    // STORAGE LIFECYCLE: Delete from "Bug images" bucket ONLY (hardcoded)
+
+    const paths = files.map((file) => `${prefix}/${file.name}`)
     const { error: deleteError } = await supabase.storage
-      .from('Bug images') // INVARIANT: Hardcoded bucket name
-      .remove([fileName])
-    
+      .from(BUG_IMAGES_BUCKET)
+      .remove(paths)
+
     if (deleteError) {
       console.error('❌ STORAGE LIFECYCLE: Bug image delete failed:', {
-        bucket: 'Bug images',
-        fileName,
+        bucket: BUG_IMAGES_BUCKET,
+        prefix,
         error: deleteError.message
       })
-      // Return error but don't throw - bug deletion should still succeed
       return { success: false, error: deleteError.message }
     }
-    
+
     return { success: true }
   } catch (err) {
-    console.error('❌ STORAGE LIFECYCLE: Unexpected error deleting bug image:', err)
+    console.error('❌ STORAGE LIFECYCLE: Unexpected error deleting bug images:', err)
     return { success: false, error: err.message }
   }
 }

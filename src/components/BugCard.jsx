@@ -10,7 +10,7 @@ const priorityConfig = {
 
 export default function BugCard({ bug }) {
   const priority = priorityConfig[bug.priority] || priorityConfig.Medium
-  const hasImage = bug.image_url
+  const hasImage = bug.preview_image
 
   return (
     <Link to={`/bug/${bug.id}`} className="block group">
@@ -19,7 +19,7 @@ export default function BugCard({ bug }) {
         {hasImage && (
           <div className="h-36 bg-gradient-to-br from-slate-100 to-slate-50 overflow-hidden relative">
             <img 
-              src={bug.image_url} 
+              src={bug.preview_image} 
               alt="" 
               className="w-full h-full object-cover group-hover:scale-110 transition-transform duration-500"
               loading="lazy"

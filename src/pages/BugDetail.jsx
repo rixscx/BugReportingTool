@@ -1,7 +1,7 @@
 import { useState, useEffect, useCallback } from 'react'
 import { useParams, useNavigate } from 'react-router-dom'
 import { supabase } from '../lib/supabaseClient'
-import { deleteBugImage } from '../lib/bugImageStorage'
+import { deleteBugImages, listBugImages } from '../lib/bugImageStorage'
 import { useKeyboardShortcut } from '../hooks/useKeyboardShortcut'
 import { SHORTCUT_KEYS } from '../lib/constants'
 import { BugDetailSkeleton } from '../components/Skeleton'
@@ -46,6 +46,7 @@ export default function BugDetail({ session, isAdmin }) {
   const deleteDialog = useConfirmDialog()
   
   const [bug, setBug] = useState(null)
+  const [bugImages, setBugImages] = useState([])
   const [loading, setLoading] = useState(true)
   const [updating, setUpdating] = useState(false)
   const [error, setError] = useState(null)
@@ -65,7 +66,10 @@ export default function BugDetail({ session, isAdmin }) {
       if (fetchError) {
         throw fetchError
       }
-      setBug(data)
+
+      const images = await listBugImages(data.user_id, data.id)
+      setBug({ ...data, preview_image: images[0] || null })
+      setBugImages(images)
     } catch {
       setError('Bug not found')
     } finally {
@@ -169,13 +173,11 @@ export default function BugDetail({ session, isAdmin }) {
         throw deleteError
       }
       
-      // STORAGE LIFECYCLE: Clean up bug image AFTER successful DB delete
-      if (bug?.image_url) {
-        const cleanupResult = await deleteBugImage(bug.image_url)
-        if (!cleanupResult.success) {
-          // Log but don't fail - bug is already deleted
-          console.error('⚠️ STORAGE LIFECYCLE: Bug image cleanup failed (non-fatal):', cleanupResult.error)
-        }
+      // STORAGE LIFECYCLE: Clean up bug images AFTER successful DB delete
+      const cleanupResult = await deleteBugImages(bug?.user_id, bug?.id)
+      if (!cleanupResult.success) {
+        // Log but don't fail - bug is already deleted
+        console.error('⚠️ STORAGE LIFECYCLE: Bug image cleanup failed (non-fatal):', cleanupResult.error)
       }
       
       showToast('Bug deleted permanently', 'success')
@@ -280,11 +282,11 @@ export default function BugDetail({ session, isAdmin }) {
                 </div>
               )}
 
-              {bug.image_url && (
+              {bug.preview_image && (
                 <div className="mt-6 pt-6 border-t border-slate-100">
                   <h3 className="text-sm font-semibold text-slate-700 mb-3">Screenshot</h3>
                   <img
-                    src={bug.image_url}
+                    src={bug.preview_image}
                     alt="Bug screenshot"
                     className="max-w-full rounded-xl border border-slate-200 shadow-sm"
                   />
