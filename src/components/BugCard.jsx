@@ -2,9 +2,7 @@ import { Link } from 'react-router-dom'
 import StatusBadge from './StatusBadge'
 import { formatSmartDate } from '../lib/dateUtils'
 import { useAuth } from '../hooks/useAuth'
-import { supabase } from '../lib/supabaseClient'
-import { deleteBugImages } from '../lib/bugImageStorage'
-import { ConfirmDialog, useConfirmDialog } from './ConfirmDialog'
+import { useBugMutations } from '../hooks/useBugs'
 import { useToast } from './Toast'
 
 const priorityConfig = {
@@ -13,51 +11,43 @@ const priorityConfig = {
   Low: { color: 'text-emerald-600', bg: 'bg-emerald-50', dot: 'bg-emerald-500', ring: 'ring-emerald-200', border: 'border-emerald-100' },
 }
 
+import { cleanMarkdown } from './MarkdownRenderer'
+
 export default function BugCard({ bug }) {
   const priority = priorityConfig[bug.priority] || priorityConfig.Medium
   const hasImage = bug.preview_image
   const { session } = useAuth()
-  const deleteDialog = useConfirmDialog()
   const { showToast } = useToast()
+  const { archiveBug, loading: archiveLoading } = useBugMutations()
 
-  const handleDelete = async () => {
-    const confirmed = await deleteDialog.confirm({
-      title: 'Delete Bug',
-      description: 'Permanently delete this bug? This action cannot be undone.',
-      confirmLabel: 'Delete Forever',
-      cancelLabel: 'Cancel',
-      confirmVariant: 'danger',
-    })
+  // Strip markdown for card preview
+  const previewText = cleanMarkdown(bug.description)
 
-    if (!confirmed) return
+  // Archive: any authenticated user can archive
+  const canArchive = session && !bug.is_archived
+
+  const handleArchive = async (e) => {
+    e.preventDefault()
+    e.stopPropagation()
+
+    if (!session) {
+      showToast('Please sign in to archive bugs', 'error')
+      return
+    }
 
     try {
-      // Log activity before deletion for audit
-      if (session && session.user) {
-        await supabase.from('bug_activity').insert({
-          bug_id: bug.id,
-          actor_id: session.user.id,
-          actor_email: session.user.email,
-          action: 'deleted',
-          metadata: { deleted_at: new Date().toISOString() },
-        })
+      const result = await archiveBug(bug.id, session.user.id, session.user.email)
+
+      if (result.success) {
+        showToast('Bug archived', 'success')
+        // Dispatch event to remove from active list
+        window.dispatchEvent(new CustomEvent('bug-archived', { detail: { id: bug.id } }))
+      } else {
+        showToast(result.error || 'Failed to archive bug', 'error')
       }
-
-      const { error } = await supabase.from('bugs').delete().eq('id', bug.id)
-      if (error) throw error
-
-      // Cleanup storage (best-effort)
-      const cleanup = await deleteBugImages(bug.user_id, bug.id)
-      if (!cleanup.success) {
-        console.error('BugCard: failed to cleanup images', cleanup.error)
-      }
-
-      showToast('Bug deleted', 'success')
-      // Emit event so lists can refresh via listeners or realtime
-      window.dispatchEvent(new CustomEvent('bug-deleted', { detail: { id: bug.id } }))
     } catch (err) {
-      console.error('Failed to delete bug from card', err)
-      showToast('Failed to delete bug', 'error')
+      console.error('Failed to archive bug', err)
+      showToast('Failed to archive bug', 'error')
     }
   }
 
@@ -67,16 +57,16 @@ export default function BugCard({ bug }) {
         {/* Image Preview */}
         {hasImage && (
           <div className="h-36 bg-gradient-to-br from-slate-100 to-slate-50 overflow-hidden relative">
-            <img 
-              src={bug.preview_image} 
-              alt="" 
+            <img
+              src={bug.preview_image}
+              alt=""
               className="w-full h-full object-cover group-hover:scale-110 transition-transform duration-500"
               loading="lazy"
             />
             <div className="absolute inset-0 bg-gradient-to-t from-black/10 to-transparent opacity-0 group-hover:opacity-100 transition-opacity" />
           </div>
         )}
-        
+
         <div className="p-5 flex flex-col flex-grow">
           {/* Header */}
           <div className="flex items-start justify-between gap-3 mb-3">
@@ -88,15 +78,28 @@ export default function BugCard({ bug }) {
                 <span className={`w-1.5 h-1.5 rounded-full ${priority.dot} animate-pulse`}></span>
                 {bug.priority}
               </span>
-              {session && (
+              {/* Archive Button - Any authenticated user, one-click, no confirmation */}
+              {canArchive && (
                 <button
-                  onClick={(e) => { e.preventDefault(); e.stopPropagation(); handleDelete(); }}
-                  title="Delete bug"
-                  className="p-1 text-slate-400 hover:text-red-600 hover:bg-red-50 rounded-md transition-colors"
+                  onClick={handleArchive}
+                  title="Archive bug"
+                  disabled={archiveLoading}
+                  className={`p-1 rounded-md transition-colors ${archiveLoading
+                    ? 'text-slate-300 cursor-not-allowed'
+                    : 'text-slate-400 hover:text-amber-600 hover:bg-amber-50'
+                    }`}
                 >
-                  <svg className="w-4 h-4" viewBox="0 0 24 24" fill="none" stroke="currentColor">
-                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16" />
-                  </svg>
+                  {archiveLoading ? (
+                    <svg className="w-4 h-4 animate-spin" viewBox="0 0 24 24" fill="none">
+                      <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4" />
+                      <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4z" />
+                    </svg>
+                  ) : (
+                    // Archive icon (box with arrow down)
+                    <svg className="w-4 h-4" viewBox="0 0 24 24" fill="none" stroke="currentColor">
+                      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M5 8h14M5 8a2 2 0 110-4h14a2 2 0 110 4M5 8v10a2 2 0 002 2h10a2 2 0 002-2V8m-9 4h4" />
+                    </svg>
+                  )}
                 </button>
               )}
             </div>
@@ -104,12 +107,17 @@ export default function BugCard({ bug }) {
 
           {/* Description */}
           <p className="text-slate-500 text-sm mb-4 line-clamp-2 flex-grow leading-relaxed">
-            {bug.description}
+            {previewText}
           </p>
 
           {/* Footer */}
           <div className="flex items-center justify-between pt-4 border-t border-slate-100">
             <StatusBadge status={bug.status} />
+            {bug.is_archived && (
+              <span className="text-xs text-amber-600 bg-amber-50 px-2 py-1 rounded-full font-medium">
+                Archived
+              </span>
+            )}
           </div>
 
           {/* Meta */}
@@ -131,7 +139,7 @@ export default function BugCard({ bug }) {
           </div>
         </div>
       </div>
-      <ConfirmDialog {...deleteDialog.dialogProps} />
     </Link>
   )
 }
+

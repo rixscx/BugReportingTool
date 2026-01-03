@@ -1,7 +1,7 @@
 import { useState, useEffect, useCallback } from 'react'
 import { supabase } from '../lib/supabaseClient'
 
-export default function CommentSection({ bugId, session }) {
+export default function CommentSection({ bugId, session, bugReporterId, bugReporterName, bugReporterEmail }) {
   const [comments, setComments] = useState([])
   const [newComment, setNewComment] = useState('')
   const [loading, setLoading] = useState(true)
@@ -22,25 +22,76 @@ export default function CommentSection({ bugId, session }) {
       if (fetchError) throw fetchError
       const commentsData = data || []
 
-      // Load commenter profiles in a separate query (no relational join)
+      // Load commenter profiles in a separate query
       const userIds = Array.from(new Set(commentsData.map(c => c.user_id).filter(Boolean)))
       let profilesMap = {}
+
+      // Parallel fetch: Profiles AND Activity Logs (to find emails for deleted/missing users)
+      const tasks = []
+
       if (userIds.length > 0) {
-        const { data: profiles } = await supabase
+        tasks.push(supabase
           .from('profiles')
           .select('id, username, email, full_name')
           .in('id', userIds)
-        profilesMap = (profiles || []).reduce((acc, p) => {
-          acc[p.id] = p
-          return acc
-        }, {})
+          .then(({ data }) => ({ type: 'profiles', data }))
+        )
       }
 
+      // Fetch activity logs where comments were created to find actor_email if profile is missing
+      tasks.push(supabase
+        .from('bug_activity')
+        .select('user_id, actor_email, actor_id')
+        .eq('bug_id', bugId)
+        .eq('action', 'comment_created')
+        .then(({ data }) => ({ type: 'activity', data }))
+      )
+
+      const results = await Promise.all(tasks)
+
+      const profilesData = results.find(r => r.type === 'profiles')?.data || []
+      const activityData = results.find(r => r.type === 'activity')?.data || []
+
+      profilesMap = profilesData.reduce((acc, p) => {
+        acc[p.id] = p
+        return acc
+      }, {})
+
+      const activityMap = activityData.reduce((acc, a) => {
+        // Map user_id (or actor_id) to the email active at that time
+        const uid = a.user_id || a.actor_id
+        if (uid && a.actor_email) {
+          acc[uid] = { email: a.actor_email, username: a.actor_email.split('@')[0] }
+        }
+        return acc
+      }, {})
+
       // Attach a `user` object to each comment to preserve existing UI
-      const enriched = commentsData.map(c => ({
-        ...c,
-        user: profilesMap[c.user_id] || null,
-      }))
+      const enriched = commentsData.map(c => {
+        // Priority 1: Profile
+        let user = profilesMap[c.user_id]
+
+        // Priority 2: Bug Reporter (if matching)
+        if (!user && c.user_id === bugReporterId && bugReporterName) {
+          user = {
+            id: c.user_id,
+            username: bugReporterName,
+            email: bugReporterEmail,
+            full_name: bugReporterName
+          }
+        }
+
+        // Priority 3: Activity Log History (Sherlock Holmes method)
+        if (!user && activityMap[c.user_id]) {
+          user = {
+            id: c.user_id,
+            username: activityMap[c.user_id].username,
+            email: activityMap[c.user_id].email
+          }
+        }
+
+        return { ...c, user }
+      })
 
       setComments(enriched)
     } catch {
@@ -221,18 +272,18 @@ export default function CommentSection({ bugId, session }) {
               <div className="flex-1 min-w-0">
                 <div className="flex items-center gap-2 mb-1">
                   <span className="font-medium text-slate-800 text-sm">
-                    {comment.user?.username || comment.user?.email || 'Unknown'}
+                    {comment.user?.username || comment.user?.email || (comment.user_id ? `User ${comment.user_id.slice(0, 4)}..` : 'Unknown')}
                   </span>
                   <span className="text-xs text-slate-400">
                     {new Date(comment.created_at).toLocaleString()}
                   </span>
                   {comment.user_id === session?.user?.id && (
-                    <div className="ml-auto flex items-center gap-2 text-xs text-slate-400">
+                    <div className="ml-auto flex items-center gap-3 text-xs font-medium">
                       <button
                         type="button"
                         onClick={() => startEditing(comment)}
                         disabled={commentActionId === comment.id}
-                        className="hover:text-slate-600"
+                        className="text-blue-600 hover:text-blue-700 disabled:opacity-50"
                       >
                         Edit
                       </button>
@@ -240,7 +291,7 @@ export default function CommentSection({ bugId, session }) {
                         type="button"
                         onClick={() => handleDelete(comment)}
                         disabled={commentActionId === comment.id}
-                        className="hover:text-red-600"
+                        className="text-red-500 hover:text-red-600 disabled:opacity-50"
                       >
                         Delete
                       </button>

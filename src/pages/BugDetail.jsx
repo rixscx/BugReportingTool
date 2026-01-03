@@ -2,6 +2,7 @@ import { useState, useEffect, useCallback } from 'react'
 import { useParams, useNavigate } from 'react-router-dom'
 import { supabase } from '../lib/supabaseClient'
 import { deleteBugImages, listBugImages } from '../lib/bugImageStorage'
+import { useBugMutations } from '../hooks/useBugs'
 import { useKeyboardShortcut } from '../hooks/useKeyboardShortcut'
 import { SHORTCUT_KEYS } from '../lib/constants'
 import { BugDetailSkeleton } from '../components/Skeleton'
@@ -14,30 +15,7 @@ import ActivityTimeline from '../components/ActivityTimeline'
 import { formatSmartDate } from '../lib/dateUtils'
 import { DropdownMenu, DropdownMenuTrigger, DropdownMenuContent, DropdownMenuItem } from '../components/DropdownMenu'
 
-// Simple markdown renderer for bold text
-const renderMarkdown = (text) => {
-  if (!text) return null
-  
-  // Split by bold patterns (**text** or __text__)
-  const parts = text.split(/(\*\*.*?\*\*|__.*?__)/g)
-  
-  return parts.map((part, index) => {
-    // Check if this part is bold
-    if (part.startsWith('**') && part.endsWith('**')) {
-      return <strong key={index} className="font-semibold text-slate-800">{part.slice(2, -2)}</strong>
-    }
-    if (part.startsWith('__') && part.endsWith('__')) {
-      return <strong key={index} className="font-semibold text-slate-800">{part.slice(2, -2)}</strong>
-    }
-    // Regular text - preserve line breaks
-    return part.split('\n').map((line, i, arr) => (
-      <span key={`${index}-${i}`}>
-        {line}
-        {i < arr.length - 1 && <br />}
-      </span>
-    ))
-  })
-}
+import MarkdownRenderer from '../components/MarkdownRenderer'
 
 export default function BugDetail({ session, isAdmin }) {
   const { id } = useParams()
@@ -45,7 +23,7 @@ export default function BugDetail({ session, isAdmin }) {
   const { showToast } = useToast()
   const archiveDialog = useConfirmDialog()
   const deleteDialog = useConfirmDialog()
-  
+
   const [bug, setBug] = useState(null)
   const [bugImages, setBugImages] = useState([])
   const [loading, setLoading] = useState(true)
@@ -83,166 +61,89 @@ export default function BugDetail({ session, isAdmin }) {
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [id])
 
-  const updateStatus = async (newStatus) => {
-    setUpdating(true)
-    setError(null)
+  /* Refactored to useBugMutations hook */
+  const {
+    updateStatus: mutateStatus,
+    archiveBug: mutateArchive,
+    unarchiveBug: mutateRestore,
+    deleteBug: mutateDelete,
+    loading: mutationLoading
+  } = useBugMutations()
+
+  const handleUpdateStatus = async (newStatus) => {
+    // Optimistic update
     const oldStatus = bug.status
-    
-    try {
-      const { error: updateError } = await supabase
-        .from('bugs')
-        .update({ status: newStatus })
-        .eq('id', id)
+    setBug(prev => ({ ...prev, status: newStatus }))
 
-      if (updateError) throw updateError
+    const result = await mutateStatus(id, newStatus, session.user.id, session.user.email, oldStatus)
 
-      setBug({ ...bug, status: newStatus })
-      await supabase.from('bug_activity').insert({
-        bug_id: id,
-        user_id: session.user.id,
-        actor_id: session.user.id,
-        actor_email: session.user.email,
-        action: 'bug_status_changed',
-        metadata: { old_status: oldStatus, new_status: newStatus },
-      })
-    } catch {
-      setError('Failed to update status')
-    } finally {
-      setUpdating(false)
+    if (!result.success) {
+      setBug(prev => ({ ...prev, status: oldStatus })) // Revert
+      showToast(result.error || 'Failed to update status', 'error')
     }
   }
 
-
-
-  const archiveBug = async () => {
-    if (!isAdmin) return
+  const handleArchive = async () => {
+    // Any authenticated user can archive
     const confirmed = await archiveDialog.confirm({
       title: 'Archive Bug',
-      description: 'Are you sure you want to archive this bug? It will be hidden from the dashboard but can be restored later.',
+      description: 'Archive this bug? It will be hidden from active bugs but can be restored later.',
       confirmText: 'Archive',
       variant: 'warning',
     })
-    
+
     if (!confirmed) return
 
-    setUpdating(true)
-    setError(null)
-    
-    try {
-      const { error: archiveError } = await supabase
-        .from('bugs')
-        .update({ is_archived: true })
-        .eq('id', id)
+    const result = await mutateArchive(id, session.user.id, session.user.email)
 
-      if (archiveError) throw archiveError
-
-      // Log activity
-      await supabase.from('bug_activity').insert({
-        bug_id: id,
-        user_id: session.user.id,
-        actor_id: session.user.id,
-        actor_email: session.user.email,
-        action: 'bug_archived',
-        metadata: { previous_is_archived: false },
-      })
-
+    if (result.success) {
       showToast('Bug archived successfully', 'success')
-      navigate('/')
-    } catch {
-      setError('Failed to archive bug')
-      showToast('Failed to archive bug', 'error')
-    } finally {
-      setUpdating(false)
+      navigate('/')  // Navigate to dashboard after archive
+    } else {
+      showToast(result.error || 'Failed to archive bug', 'error')
     }
   }
 
-  const restoreBug = async () => {
-    if (!isAdmin) return
-    setUpdating(true)
-    setError(null)
-    
-    try {
-      const { error: restoreError } = await supabase
-        .from('bugs')
-        .update({ is_archived: false })
-        .eq('id', id)
+  const handleRestore = async () => {
+    // Any authenticated user can restore
+    const result = await mutateRestore(id, session.user.id, session.user.email)
 
-      if (restoreError) throw restoreError
-
-      // Log activity
-      await supabase.from('bug_activity').insert({
-        bug_id: id,
-        user_id: session.user.id,
-        actor_id: session.user.id,
-        actor_email: session.user.email,
-        action: 'bug_restored',
-        metadata: { previous_is_archived: true },
-      })
-
+    if (result.success) {
       showToast('Bug restored successfully', 'success')
       fetchBug()
-    } catch {
-      setError('Failed to restore bug')
-      showToast('Failed to restore bug', 'error')
-    } finally {
-      setUpdating(false)
+    } else {
+      showToast(result.error || 'Failed to restore bug', 'error')
     }
   }
 
-  // STORAGE LIFECYCLE: Delete bug with image cleanup
-  const deleteBug = async () => {
+  const handleDelete = async () => {
+    // Permission check: Admin OR owner can delete
+    const canDelete = isAdmin || bug.user_id === session.user.id
+    if (!canDelete) {
+      showToast('Permission denied: Only admin or bug reporter can delete', 'error')
+      return
+    }
+
     const confirmed = await deleteDialog.confirm({
       title: 'Delete Bug Permanently',
-      description: 'Are you sure you want to PERMANENTLY DELETE this bug? This action cannot be undone and all comments and activity will be lost.',
+      description: `Are you sure you want to PERMANENTLY DELETE "${bug.title}"? This action cannot be undone. The bug will be archived for audit purposes.`,
       confirmText: 'Delete Forever',
       variant: 'danger',
     })
-    
+
     if (!confirmed) return
 
-    setUpdating(true)
-    setError(null)
-    
     try {
-      // Log activity BEFORE deletion
-      await supabase.from('bug_activity').insert({
-        bug_id: id,
-        actor_id: session.user.id,
-        actor_email: session.user.email,
-        action: 'deleted',
-        metadata: { deleted_at: new Date().toISOString() },
-      })
+      const result = await mutateDelete(bug, session.user.id, session.user.email, isAdmin)
 
-      // DB/RLS AUDIT: Delete bug from database
-      const { error: deleteError } = await supabase
-        .from('bugs')
-        .delete()
-        .eq('id', id)
-
-      if (deleteError) {
-        // DB/RLS AUDIT: Fail loudly on delete errors
-        console.error('❌ DB/RLS AUDIT: Bug delete failed:', {
-          bugId: id,
-          code: deleteError.code,
-          message: deleteError.message
-        })
-        throw deleteError
+      if (result.success) {
+        showToast('Bug permanently deleted', 'success')
+        navigate('/')
+      } else {
+        showToast(result.error || 'Failed to delete bug', 'error')
       }
-      
-      // STORAGE LIFECYCLE: Clean up bug images AFTER successful DB delete
-      const cleanupResult = await deleteBugImages(bug?.user_id, bug?.id)
-      if (!cleanupResult.success) {
-        // Log but don't fail - bug is already deleted
-        console.error('⚠️ STORAGE LIFECYCLE: Bug image cleanup failed (non-fatal):', cleanupResult.error)
-      }
-      
-      showToast('Bug deleted permanently', 'success')
-      navigate('/')
-    } catch {
-      setError('Failed to delete bug')
-      showToast('Failed to delete bug', 'error')
-    } finally {
-      setUpdating(false)
+    } catch (err) {
+      showToast(err.message || 'Failed to delete bug', 'error')
     }
   }
 
@@ -291,7 +192,7 @@ export default function BugDetail({ session, isAdmin }) {
             </button>
           </div>
         )}
-        
+
         {/* Header */}
         <div className="flex items-center justify-between gap-4 mb-6">
           <div className="flex items-center gap-4">
@@ -310,12 +211,12 @@ export default function BugDetail({ session, isAdmin }) {
               <CopyIconButton text={window.location.href} size="sm" title="Copy link" />
             </div>
           </div>
-          
+
           {/* Actions Menu */}
           <DropdownMenu>
             {({ open, setOpen }) => (
               <>
-                <DropdownMenuTrigger 
+                <DropdownMenuTrigger
                   onClick={() => setOpen(!open)}
                   className="p-2 text-slate-400 hover:text-slate-600 hover:bg-white rounded-lg transition-colors"
                 >
@@ -324,10 +225,11 @@ export default function BugDetail({ session, isAdmin }) {
                   </svg>
                 </DropdownMenuTrigger>
                 <DropdownMenuContent open={open} align="end">
-                  {isAdmin && !bug.is_archived && (
-                    <DropdownMenuItem 
-                      onClick={() => { setOpen(false); archiveBug(); }} 
-                      disabled={updating}
+                  {/* Archive - available to ALL authenticated users */}
+                  {!bug.is_archived && (
+                    <DropdownMenuItem
+                      onClick={() => { setOpen(false); handleArchive(); }}
+                      disabled={mutationLoading}
                       icon={<svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                         <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M5 8h14M5 8a2 2 0 110-4h14a2 2 0 110 4M5 8v10a2 2 0 002 2h10a2 2 0 002-2V8m-9 4h4" />
                       </svg>}
@@ -335,10 +237,11 @@ export default function BugDetail({ session, isAdmin }) {
                       Archive
                     </DropdownMenuItem>
                   )}
-                  {isAdmin && bug.is_archived && (
-                    <DropdownMenuItem 
-                      onClick={() => { setOpen(false); restoreBug(); }} 
-                      disabled={updating}
+                  {/* Restore - available to ALL authenticated users */}
+                  {bug.is_archived && (
+                    <DropdownMenuItem
+                      onClick={() => { setOpen(false); handleRestore(); }}
+                      disabled={mutationLoading}
                       icon={<svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                         <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M4 4v5h.582m15.356 2A8.001 8.001 0 004.582 9m0 0H9m11 11v-5h-.581m0 0a8.003 8.003 0 01-15.357-2m15.357 2H15" />
                       </svg>}
@@ -347,9 +250,9 @@ export default function BugDetail({ session, isAdmin }) {
                     </DropdownMenuItem>
                   )}
                   {(session.user.id === bug.user_id || isAdmin) && (
-                    <DropdownMenuItem 
-                      onClick={() => { setOpen(false); deleteBug(); }} 
-                      disabled={updating}
+                    <DropdownMenuItem
+                      onClick={() => { setOpen(false); handleDelete(); }}
+                      disabled={mutationLoading}
                       variant="danger"
                       icon={<svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                         <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16" />
@@ -371,15 +274,22 @@ export default function BugDetail({ session, isAdmin }) {
             <div className="bg-white rounded-2xl border border-slate-200 p-6 shadow-sm">
               <div className="flex items-start justify-between gap-4 mb-6">
                 <h1 className="text-2xl font-bold text-slate-800 leading-tight">{bug.title}</h1>
-                <span className={`flex-shrink-0 px-3 py-1.5 rounded-full text-sm font-medium ${priorityColors[bug.priority]}`}>
-                  {bug.priority}
-                </span>
+                <div className="flex items-center gap-2 flex-shrink-0">
+                  {bug.is_archived && (
+                    <span className="px-3 py-1.5 rounded-full text-sm font-medium bg-amber-100 text-amber-700">
+                      Archived
+                    </span>
+                  )}
+                  <span className={`px-3 py-1.5 rounded-full text-sm font-medium ${priorityColors[bug.priority]}`}>
+                    {bug.priority}
+                  </span>
+                </div>
               </div>
 
               <div className="prose prose-slate max-w-none">
                 <h3 className="text-sm font-semibold text-slate-700 mb-2">Description</h3>
                 <div className="text-slate-600 text-sm leading-relaxed">
-                  {renderMarkdown(bug.description)}
+                  <MarkdownRenderer content={bug.description} />
                 </div>
               </div>
 
@@ -387,7 +297,7 @@ export default function BugDetail({ session, isAdmin }) {
                 <div className="mt-6 pt-6 border-t border-slate-100">
                   <h3 className="text-sm font-semibold text-slate-700 mb-2">Steps to Reproduce</h3>
                   <div className="text-slate-600 text-sm leading-relaxed">
-                    {renderMarkdown(bug.steps_to_reproduce)}
+                    <MarkdownRenderer content={bug.steps_to_reproduce} />
                   </div>
                 </div>
               )}
@@ -405,7 +315,13 @@ export default function BugDetail({ session, isAdmin }) {
             </div>
 
             {/* Comments Section */}
-            <CommentSection bugId={bug.id} session={session} />
+            <CommentSection
+              bugId={bug.id}
+              session={session}
+              bugReporterId={bug.user_id}
+              bugReporterName={bug.reported_by_name}
+              bugReporterEmail={bug.reported_by_email}
+            />
 
             {/* Activity Timeline */}
             <div className="bg-white rounded-2xl border border-slate-200 p-6 shadow-sm">
@@ -419,7 +335,7 @@ export default function BugDetail({ session, isAdmin }) {
             {/* Status & Assignment */}
             <div className="bg-white rounded-2xl border border-slate-200 p-6 shadow-sm">
               <h3 className="text-sm font-semibold text-slate-700 mb-4">Details</h3>
-              
+
               <div className="space-y-4">
                 <div>
                   <label className="block text-xs font-medium text-slate-500 uppercase tracking-wide mb-2">Status</label>
@@ -458,34 +374,54 @@ export default function BugDetail({ session, isAdmin }) {
             </div>
           </div>
 
-            {/* Admin Actions */}
-            {isAdmin && (
-              <div className="bg-white rounded-2xl border border-slate-200 p-6 shadow-sm">
-                <h3 className="text-sm font-semibold text-slate-700 mb-4">Actions</h3>
-                <div className="space-y-2">
-                  <button
-                    onClick={archiveBug}
-                    disabled={updating}
-                    className="w-full px-4 py-2.5 text-sm bg-slate-100 text-slate-700 rounded-lg hover:bg-slate-200 disabled:opacity-50 disabled:cursor-not-allowed transition-colors flex items-center justify-center gap-2"
-                  >
-                    <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M5 8h14M5 8a2 2 0 110-4h14a2 2 0 110 4M5 8v10a2 2 0 002 2h10a2 2 0 002-2V8m-9 4h4" />
-                    </svg>
-                    Archive Bug
-                  </button>
-                  <button
-                    onClick={deleteBug}
-                    disabled={updating}
-                    className="w-full px-4 py-2.5 text-sm bg-red-50 text-red-600 rounded-lg hover:bg-red-100 disabled:opacity-50 disabled:cursor-not-allowed transition-colors flex items-center justify-center gap-2"
-                  >
-                    <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16" />
-                    </svg>
-                    Delete Permanently
-                  </button>
-                </div>
-              </div>
-            )}
+          {/* Actions - Available to all authenticated users */}
+          <div className="bg-white rounded-2xl border border-slate-200 p-6 shadow-sm">
+            <h3 className="text-sm font-semibold text-slate-700 mb-4">Actions</h3>
+            <div className="space-y-2">
+              {/* Archive - any auth user */}
+              <button
+                onClick={handleArchive}
+                disabled={mutationLoading || bug.is_archived}
+                className={`w-full px-4 py-2.5 text-sm rounded-lg flex items-center justify-center gap-2 transition-colors ${bug.is_archived
+                  ? 'bg-slate-100 text-slate-400 cursor-not-allowed'
+                  : 'bg-amber-50 text-amber-700 hover:bg-amber-100'
+                  }`}
+              >
+                <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M5 8h14M5 8a2 2 0 110-4h14a2 2 0 110 4M5 8v10a2 2 0 002 2h10a2 2 0 002-2V8m-9 4h4" />
+                </svg>
+                {bug.is_archived ? 'Already Archived' : 'Archive Bug'}
+              </button>
+
+              {/* Restore - any auth user, only shown when archived */}
+              {bug.is_archived && (
+                <button
+                  onClick={handleRestore}
+                  disabled={mutationLoading}
+                  className="w-full px-4 py-2.5 text-sm bg-green-50 text-green-700 rounded-lg hover:bg-green-100 disabled:opacity-50 disabled:cursor-not-allowed transition-colors flex items-center justify-center gap-2"
+                >
+                  <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M4 4v5h.582m15.356 2A8.001 8.001 0 004.582 9m0 0H9m11 11v-5h-.581m0 0a8.003 8.003 0 01-15.357-2m15.357 2H15" />
+                  </svg>
+                  Restore Bug
+                </button>
+              )}
+
+              {/* Delete - only admin or owner */}
+              {(isAdmin || session?.user?.id === bug.user_id) && (
+                <button
+                  onClick={handleDelete}
+                  disabled={mutationLoading}
+                  className="w-full px-4 py-2.5 text-sm bg-red-50 text-red-600 rounded-lg hover:bg-red-100 disabled:opacity-50 disabled:cursor-not-allowed transition-colors flex items-center justify-center gap-2"
+                >
+                  <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16" />
+                  </svg>
+                  Delete Permanently
+                </button>
+              )}
+            </div>
+          </div>
         </div>
       </div>
 

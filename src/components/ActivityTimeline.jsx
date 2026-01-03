@@ -6,16 +6,44 @@ export default function ActivityTimeline({ bugId }) {
   const [loading, setLoading] = useState(true)
 
   const fetchActivities = useCallback(async () => {
-    const { data, error } = await supabase
-      .from('bug_activity')
-      .select(`*`)
-      .eq('bug_id', bugId)
-      .order('created_at', { ascending: false })
+    try {
+      const { data, error: fetchError } = await supabase
+        .from('bug_activity')
+        .select(`*`)
+        .eq('bug_id', bugId)
+        .order('created_at', { ascending: false })
 
-    if (!error) {
-      setActivities(data || [])
+      if (fetchError) throw fetchError
+
+      // Fetch profiles
+      const actorIds = [...new Set((data || []).map(a => a.actor_id).filter(Boolean))]
+      let profilesMap = {}
+      if (actorIds.length > 0) {
+        const { data: profiles } = await supabase
+          .from('profiles')
+          .select('id, username, email, full_name')
+          .in('id', actorIds)
+
+        profilesMap = (profiles || []).reduce((acc, p) => {
+          acc[p.id] = p
+          return acc
+        }, {})
+      }
+
+      const enriched = (data || []).map(activity => ({
+        ...activity,
+        user: profilesMap[activity.actor_id] || {
+          email: activity.actor_email || 'Unknown',
+          username: activity.actor_email ? activity.actor_email.split('@')[0] : 'Unknown'
+        }
+      }))
+
+      setActivities(enriched)
+    } catch (err) {
+      console.error('Error fetching activities:', err)
+    } finally {
+      setLoading(false)
     }
-    setLoading(false)
   }, [bugId])
 
   useEffect(() => {

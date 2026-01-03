@@ -16,7 +16,7 @@ export default function Navbar({ session, userProfile, isAdmin }) {
   const deleteDialog = useConfirmDialog()
   const [showShortcutsHelp, setShowShortcutsHelp] = useState(false)
   const [showUserMenu, setShowUserMenu] = useState(false)
-  
+
   // PHASE 2 — PROCEDURAL AVATAR FIX: Memoize avatar URL with [proceduralAvatarSeed] dependency
   // This ensures avatar changes when seed changes (e.g., "Generate New Avatar" clicked)
   const provider = session?.user?.app_metadata?.provider || session?.user?.user_metadata?.provider || session?.user?.user_metadata?.iss || ''
@@ -81,18 +81,18 @@ export default function Navbar({ session, userProfile, isAdmin }) {
       cancelText: 'Cancel',
       variant: 'danger',
     })
-    
+
     if (!confirmed) return
 
     try {
       setShowUserMenu(false)
       showToast('Deleting account...', 'info')
-      
+
       await deleteAccount()
-      
+
       // Success message (will show briefly before redirect)
       showToast('Account deleted successfully', 'success')
-      
+
     } catch (err) {
       console.error('Delete account error:', err)
       showToast(
@@ -134,23 +134,30 @@ export default function Navbar({ session, userProfile, isAdmin }) {
               <div className="hidden sm:flex items-center gap-1">
                 <Link
                   to="/"
-                  className={`px-4 py-2 rounded-lg text-sm font-medium transition-all ${
-                    isActive('/') 
-                      ? 'bg-slate-100 text-slate-900' 
+                  className={`px-4 py-2 rounded-lg text-sm font-medium transition-all ${isActive('/')
+                      ? 'bg-slate-100 text-slate-900'
                       : 'text-slate-600 hover:text-slate-900 hover:bg-slate-50'
-                  }`}
+                    }`}
                 >
                   Dashboard
                 </Link>
                 <Link
                   to="/create"
-                  className={`px-4 py-2 rounded-lg text-sm font-medium transition-all ${
-                    isActive('/create')
+                  className={`px-4 py-2 rounded-lg text-sm font-medium transition-all ${isActive('/create')
                       ? 'bg-slate-100 text-slate-900'
                       : 'text-slate-600 hover:text-slate-900 hover:bg-slate-50'
-                  }`}
+                    }`}
                 >
                   Report Bug
+                </Link>
+                <Link
+                  to="/logs"
+                  className={`px-4 py-2 rounded-lg text-sm font-medium transition-all ${isActive('/logs')
+                      ? 'bg-slate-100 text-slate-900'
+                      : 'text-slate-600 hover:text-slate-900 hover:bg-slate-50'
+                    }`}
+                >
+                  Logs
                 </Link>
               </div>
             </div>
@@ -197,7 +204,7 @@ export default function Navbar({ session, userProfile, isAdmin }) {
                   {profileLoading ? (
                     <div className="w-9 h-9 rounded-xl bg-slate-200 animate-pulse" />
                   ) : resolvedAvatar ? (
-                    <img 
+                    <img
                       src={resolvedAvatar}
                       alt={userProfile?.username || 'User'}
                       className="w-9 h-9 rounded-xl ring-2 ring-white shadow-md"
@@ -218,7 +225,7 @@ export default function Navbar({ session, userProfile, isAdmin }) {
                       {profileLoading ? (
                         <div className="w-10 h-10 rounded-lg bg-slate-200 animate-pulse" />
                       ) : resolvedAvatar ? (
-                        <img 
+                        <img
                           src={resolvedAvatar}
                           alt={userProfile?.username || 'User'}
                           className="w-10 h-10 rounded-lg ring-1 ring-slate-200"
@@ -236,7 +243,7 @@ export default function Navbar({ session, userProfile, isAdmin }) {
                         </p>
                       </div>
                     </div>
-                    
+
                     <button
                       onClick={() => {
                         navigate('/edit-profile')
@@ -249,7 +256,7 @@ export default function Navbar({ session, userProfile, isAdmin }) {
                       </svg>
                       Edit Profile
                     </button>
-                    
+
                     <button
                       onClick={() => {
                         setShowShortcutsHelp(true)
@@ -265,7 +272,7 @@ export default function Navbar({ session, userProfile, isAdmin }) {
                       </span>
                       <kbd className="text-xs bg-slate-100 px-2 py-1 rounded-md text-slate-500 font-semibold">Ctrl+/</kbd>
                     </button>
-                    
+
                     <div className="border-t border-slate-100 mt-1 pt-1">
                       <button
                         onClick={handleSignOut}
@@ -279,7 +286,7 @@ export default function Navbar({ session, userProfile, isAdmin }) {
                         </span>
                         <kbd className="text-xs bg-red-100 px-2 py-1 rounded-md text-red-500 font-semibold">Ctrl+Shift+X</kbd>
                       </button>
-                      
+
                       {!isTestAccount && (
                         <button
                           onClick={handleDeleteAccount}
@@ -303,9 +310,8 @@ export default function Navbar({ session, userProfile, isAdmin }) {
         <div className="sm:hidden border-t border-slate-100 px-4 py-2 flex items-center justify-around bg-slate-50">
           <Link
             to="/"
-            className={`flex flex-col items-center gap-0.5 px-4 py-1.5 rounded-md ${
-              isActive('/') ? 'text-blue-600' : 'text-slate-500'
-            }`}
+            className={`flex flex-col items-center gap-0.5 px-4 py-1.5 rounded-md ${isActive('/') ? 'text-blue-600' : 'text-slate-500'
+              }`}
           >
             <svg className="w-5 h-5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
               <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M3 12l2-2m0 0l7-7 7 7M5 10v10a1 1 0 001 1h3m10-11l2 2m-2-2v10a1 1 0 01-1 1h-3m-6 0a1 1 0 001-1v-4a1 1 0 011-1h2a1 1 0 011 1v4a1 1 0 001 1m-6 0h6" />
@@ -314,9 +320,8 @@ export default function Navbar({ session, userProfile, isAdmin }) {
           </Link>
           <Link
             to="/create"
-            className={`flex flex-col items-center gap-0.5 px-4 py-1.5 rounded-md ${
-              isActive('/create') ? 'text-blue-600' : 'text-slate-500'
-            }`}
+            className={`flex flex-col items-center gap-0.5 px-4 py-1.5 rounded-md ${isActive('/create') ? 'text-blue-600' : 'text-slate-500'
+              }`}
           >
             <svg className="w-5 h-5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
               <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 4v16m8-8H4" />
@@ -326,11 +331,11 @@ export default function Navbar({ session, userProfile, isAdmin }) {
         </div>
       </nav>
 
-      <KeyboardShortcutsHelp 
-        isOpen={showShortcutsHelp} 
-        onClose={() => setShowShortcutsHelp(false)} 
+      <KeyboardShortcutsHelp
+        isOpen={showShortcutsHelp}
+        onClose={() => setShowShortcutsHelp(false)}
       />
-      
+
       <ConfirmDialog {...deleteDialog.dialogProps} />
     </>
   )

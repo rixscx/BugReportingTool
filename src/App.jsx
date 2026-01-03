@@ -16,6 +16,7 @@ const Dashboard = lazy(() => import('./pages/Dashboard'))
 const CreateBug = lazy(() => import('./pages/CreateBug'))
 const BugDetail = lazy(() => import('./pages/BugDetail'))
 const EditProfile = lazy(() => import('./pages/EditProfile'))
+const Logs = lazy(() => import('./pages/Logs'))
 
 if (typeof window !== 'undefined') {
   initWatermark()
@@ -26,9 +27,9 @@ function AuthenticatedApp({ session, userProfile, isAdmin }) {
 
   return (
     <>
-      <Navbar 
-        session={session} 
-        userProfile={userProfile} 
+      <Navbar
+        session={session}
+        userProfile={userProfile}
         isAdmin={isAdmin}
       />
       <main className="min-h-[calc(100vh-56px)]">
@@ -41,6 +42,7 @@ function AuthenticatedApp({ session, userProfile, isAdmin }) {
               path="/bug/:id"
               element={<BugDetail session={session} isAdmin={isAdmin} />}
             />
+            <Route path="/logs" element={<Logs />} />
             <Route path="*" element={<Navigate to="/" replace />} />
           </Routes>
         </Suspense>
@@ -69,7 +71,7 @@ function AppContent() {
   }
 
   return (
-    <AuthenticatedApp 
+    <AuthenticatedApp
       session={session}
       userProfile={userProfile}
       isAdmin={isAdmin}
