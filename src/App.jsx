@@ -58,10 +58,28 @@ function AuthenticatedApp({ session, userProfile, isAdmin }) {
 }
 
 function AppContent() {
-  const { session, userProfile, loading, isAdmin } = useAuth()
+  const { session, userProfile, loading, isAdmin, configError } = useAuth()
 
   if (loading) {
     return <PageLoader />
+  }
+
+  // Show configuration error if Supabase is not set up
+  if (configError) {
+    return (
+      <div className="min-h-screen bg-[#06060a] flex items-center justify-center p-6">
+        <div className="bg-[rgba(12,12,18,0.95)] backdrop-blur-2xl rounded-3xl border border-[rgba(239,68,68,0.2)] p-8 max-w-lg text-center">
+          <div className="w-14 h-14 mx-auto mb-4 bg-gradient-to-br from-[rgba(239,68,68,0.2)] to-[rgba(239,68,68,0.1)] rounded-2xl flex items-center justify-center">
+            <svg className="w-7 h-7 text-[#f87171]" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 9v2m0 4h.01m-6.938 4h13.856c1.54 0 2.502-1.667 1.732-3L13.732 4c-.77-1.333-2.694-1.333-3.464 0L3.34 16c-.77 1.333.192 3 1.732 3z" />
+            </svg>
+          </div>
+          <h1 className="text-xl font-bold text-[#f0f0f5] mb-2">Configuration Error</h1>
+          <p className="text-[#9898a8] text-sm mb-4">{configError}</p>
+          <p className="text-[#6b6b7b] text-xs">Please check your Vercel environment variables.</p>
+        </div>
+      </div>
+    )
   }
 
   if (!session) {
@@ -86,7 +104,7 @@ function AppContent() {
 function App() {
   return (
     <ErrorBoundary>
-      <BrowserRouter basename={import.meta.env.BASE_URL}>
+      <BrowserRouter>
         <AuthProvider>
           <ToastProvider>
             <AppContent />

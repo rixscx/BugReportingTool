@@ -1,6 +1,6 @@
 {
-  "name": "bug-reporting-tool",
-  "description": "Professional bug tracking application with real-time updates",
+  "name": "cpt-buggy",
+  "description": "Cpt Buggy - Professional bug tracking application with real-time updates",
   "version": "1.0.0",
   "author": "rixscx",
   "license": "MIT",
@@ -18,10 +18,10 @@
     "deploy": "npm run build && vercel --prod",
     "build:prod": "npm run lint && npm run build",
     "analyze": "npm run build && du -sh dist && find dist/assets -type f -exec du -h {} \\; | sort -rh",
-    "docker:build": "docker build -t bug-reporting-tool:latest .",
-    "docker:run": "docker run -d --name bug-reporting-tool -p 3000:3000 -e VITE_SUPABASE_URL=$VITE_SUPABASE_URL -e VITE_SUPABASE_ANON_KEY=$VITE_SUPABASE_ANON_KEY bug-reporting-tool:latest",
-    "docker:compose": "docker-compose up -d",
-    "docker:logs": "docker-compose logs -f bug-reporting-tool",
+    "docker:build": "docker build --build-arg VITE_SUPABASE_URL=$VITE_SUPABASE_URL --build-arg VITE_SUPABASE_ANON_KEY=$VITE_SUPABASE_ANON_KEY -t bug-reporting-tool:latest .",
+    "docker:run": "docker run -d --name bug-reporting-tool -p 80:80 bug-reporting-tool:latest",
+    "docker:compose": "docker-compose up -d --build",
+    "docker:logs": "docker logs -f bug-reporting-tool",
     "docker:stop": "docker-compose down",
     "docker:clean": "docker-compose down -v && docker system prune -f"
   },
@@ -43,8 +43,6 @@
     "eslint-plugin-react-refresh": "^0.4.24",
     "globals": "^16.5.0",
     "tailwindcss": "^4.1.18",
-    "terser": "^5.44.1",
-    "vite": "^7.2.4",
-    "vite-plugin-compression": "^0.5.1"
+    "vite": "^7.2.4"
   }
 }

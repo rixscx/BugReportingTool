@@ -1,5 +1,5 @@
 import { useState } from 'react'
-import { supabase } from '../lib/supabaseClient'
+import { supabase, isSupabaseConfigured } from '../lib/supabaseClient'
 
 export default function Auth() {
   const [loading, setLoading] = useState(false)
@@ -8,7 +8,7 @@ export default function Auth() {
   const [isSignUp, setIsSignUp] = useState(false)
   const [isForgotPassword, setIsForgotPassword] = useState(false)
   const [showPassword, setShowPassword] = useState(false)
-  const [error, setError] = useState(null)
+  const [error, setError] = useState(isSupabaseConfigured ? null : 'Application not configured. Please contact administrator.')
   const [success, setSuccess] = useState(null)
 
   const getPasswordStrength = (pass) => {
@@ -31,6 +31,10 @@ export default function Auth() {
 
   const handleForgotPassword = async (e) => {
     e.preventDefault()
+    if (!supabase) {
+      setError('Application not configured')
+      return
+    }
     if (!email) {
       setError('Please enter your email address')
       return
@@ -57,6 +61,10 @@ export default function Auth() {
   }
 
   const handleGoogleSignIn = async () => {
+    if (!supabase) {
+      setError('Application not configured')
+      return
+    }
     setLoading(true)
     setError(null)
 
@@ -86,6 +94,10 @@ export default function Auth() {
 
   const handleAuth = async (e) => {
     e.preventDefault()
+    if (!supabase) {
+      setError('Application not configured')
+      return
+    }
     setLoading(true)
     setError(null)
     setSuccess(null)
@@ -159,24 +171,19 @@ export default function Auth() {
 
         <div className="relative z-10">
           <div className="flex items-center gap-3">
-            <div className="w-12 h-12 rounded-2xl bg-gradient-to-br from-[#6366f1] via-[#8b5cf6] to-[#a855f7] flex items-center justify-center shadow-[0_4px_30px_rgba(99,102,241,0.4)]">
-              <svg className="w-6 h-6 text-white" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5">
-                <circle cx="12" cy="12" r="10" />
-                <path d="M12 8v4M12 16h.01" strokeLinecap="round" />
-              </svg>
-            </div>
-            <span className="text-2xl font-bold text-[#f0f0f5] tracking-tight">BugTracker</span>
+            <img src="/logo-buggy.svg" alt="Cpt Buggy" className="w-14 h-14" />
+            <span className="text-2xl font-bold text-[#f0f0f5] tracking-tight">Cpt Buggy</span>
           </div>
         </div>
 
         <div className="space-y-10 relative z-10 max-w-lg">
           <div className="space-y-6">
             <h1 className="text-5xl xl:text-6xl font-bold text-[#f0f0f5] leading-[1.1] tracking-tight">
-              Track bugs,<br />
-              <span className="bg-gradient-to-r from-[#6366f1] via-[#8b5cf6] to-[#a855f7] bg-clip-text text-transparent">ship faster.</span>
+              Squash bugs,<br />
+              <span className="bg-gradient-to-r from-[#ef4444] via-[#f97316] to-[#eab308] bg-clip-text text-transparent">sail smooth.</span>
             </h1>
             <p className="text-lg text-[#6b6b7b] leading-relaxed">
-              A simple and powerful bug tracking tool for teams who want to build better software.
+              A flashy and powerful bug tracking tool for crews who want to conquer the Grand Line of software.
             </p>
           </div>
 
@@ -188,17 +195,17 @@ export default function Auth() {
             </div>
             <div>
               <div className="text-4xl font-bold text-[#f0f0f5]">10k+</div>
-              <div className="text-sm text-[#4a4a58] mt-1">Bugs Fixed</div>
+              <div className="text-sm text-[#4a4a58] mt-1">Bugs Squashed</div>
             </div>
             <div>
               <div className="text-4xl font-bold text-[#f0f0f5]">500+</div>
-              <div className="text-sm text-[#4a4a58] mt-1">Teams</div>
+              <div className="text-sm text-[#4a4a58] mt-1">Crews</div>
             </div>
           </div>
         </div>
 
         <div className="text-[#3a3a48] text-sm relative z-10">
-          © 2026 BugTracker. All rights reserved.
+          © 2026 Cpt Buggy. All rights reserved.
         </div>
       </div>
 
@@ -207,13 +214,8 @@ export default function Auth() {
         <div className="w-full max-w-md relative z-10">
           {/* Mobile logo */}
           <div className="lg:hidden flex items-center justify-center gap-3 mb-10">
-            <div className="w-11 h-11 rounded-2xl bg-gradient-to-br from-[#6366f1] via-[#8b5cf6] to-[#a855f7] flex items-center justify-center shadow-[0_4px_24px_rgba(99,102,241,0.4)]">
-              <svg className="w-5 h-5 text-white" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5">
-                <circle cx="12" cy="12" r="10" />
-                <path d="M12 8v4M12 16h.01" strokeLinecap="round" />
-              </svg>
-            </div>
-            <span className="text-xl font-bold text-[#f0f0f5] tracking-tight">BugTracker</span>
+            <img src="/logo-buggy.svg" alt="Cpt Buggy" className="w-12 h-12" />
+            <span className="text-xl font-bold text-[#f0f0f5] tracking-tight">Cpt Buggy</span>
           </div>
 
           {/* Form area - minimal styling, fluid */}

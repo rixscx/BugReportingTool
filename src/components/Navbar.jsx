@@ -115,16 +115,13 @@ export default function Navbar({ session, userProfile, isAdmin }) {
           <div className="flex items-center justify-between h-16">
             {/* Left: Logo + Nav - pushed to left edge */}
             <div className="flex items-center gap-8">
-              <Link to="/" className="flex items-center gap-3 group">
-                <div className="relative w-9 h-9 rounded-2xl bg-gradient-to-br from-[#6366f1] via-[#8b5cf6] to-[#a855f7] flex items-center justify-center shadow-[0_4px_20px_rgba(99,102,241,0.4)] group-hover:shadow-[0_8px_30px_rgba(99,102,241,0.5)] transition-all duration-300 group-hover:scale-105">
-                  {/* Inner glow */}
-                  <div className="absolute inset-[1px] rounded-2xl bg-gradient-to-br from-white/20 to-transparent" />
-                  <svg className="relative w-5 h-5 text-white" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5">
-                    <circle cx="12" cy="12" r="10" />
-                    <path d="M12 8v4M12 16h.01" strokeLinecap="round" />
-                  </svg>
-                </div>
-                <span className="text-[16px] font-semibold text-[#f0f0f5] hidden sm:block tracking-[-0.02em]">BugTracker</span>
+              <Link to="/" className="flex items-center gap-2.5 group">
+                <img 
+                  src="/logo-buggy.svg" 
+                  alt="Cpt Buggy" 
+                  className="w-10 h-10 group-hover:scale-105 transition-transform duration-300"
+                />
+                <span className="text-[16px] font-semibold text-[#f0f0f5] hidden sm:block tracking-[-0.02em]">Cpt Buggy</span>
               </Link>
 
               <nav className="hidden sm:flex items-center gap-1">

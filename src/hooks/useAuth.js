@@ -1,5 +1,5 @@
 import { useState, useEffect, useCallback, useRef, createContext, useContext, createElement } from 'react'
-import { supabase } from '../lib/supabaseClient'
+import { supabase, isSupabaseConfigured } from '../lib/supabaseClient'
 
 /**
  * AVATAR SYSTEM INVARIANTS:
@@ -29,10 +29,25 @@ export function AuthProvider({ children }) {
   const [session, setSession] = useState(null)
   const [userProfile, setUserProfile] = useState(null)
   const [loading, setLoading] = useState(true)
+  const [configError, setConfigError] = useState(null)
   const fetchingRef = useRef(false)
   const lastFetchedUserIdRef = useRef(null)
 
+  // Check if Supabase is configured
+  useEffect(() => {
+    if (!isSupabaseConfigured) {
+      setConfigError('Supabase is not configured. Please set VITE_SUPABASE_URL and VITE_SUPABASE_ANON_KEY environment variables.')
+      setLoading(false)
+    }
+  }, [])
+
   const fetchUserProfile = useCallback(async (userId, userEmail, userMetadata) => {
+    // Guard against missing supabase client
+    if (!supabase) {
+      console.error('❌ Supabase client not initialized')
+      return
+    }
+
     // Guard against undefined/null userId
     if (!userId || typeof userId !== 'string') {
       console.error('❌ Invalid userId provided to fetchUserProfile:', { userId, userEmail })
@@ -129,6 +144,11 @@ export function AuthProvider({ children }) {
   useEffect(() => {
     let isMounted = true
 
+    // Don't initialize if supabase is not configured
+    if (!supabase || !isSupabaseConfigured) {
+      return
+    }
+
     // Get initial session
     supabase.auth.getSession().then(({ data: { session }, error }) => {
       if (!isMounted) return
@@ -181,12 +201,15 @@ export function AuthProvider({ children }) {
     setUserProfile(null)
     lastFetchedUserIdRef.current = null
     fetchingRef.current = false
-    await supabase.auth.signOut()
+    if (supabase) {
+      await supabase.auth.signOut()
+    }
   }, [])
 
   // Delete account
   const deleteAccount = useCallback(async () => {
     if (!session?.user?.id) throw new Error('No user session')
+    if (!supabase) throw new Error('Supabase not configured')
 
     try {
       const { data, error } = await supabase.rpc('delete_my_account')
@@ -250,6 +273,7 @@ export function AuthProvider({ children }) {
     isAdmin,
     isAuthenticated,
     isTestAccount,
+    configError,
     signOut,
     deleteAccount,
     refetchProfile,

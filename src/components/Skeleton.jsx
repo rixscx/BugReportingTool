@@ -105,13 +105,31 @@ export function LoadingSpinner({ size = 'md', className = '' }) {
 
 export function PageLoader({ text = '' }) {
   return (
-    <div className="min-h-screen flex items-center justify-center bg-[#06060a]">
-      <div className="text-center">
-        <div className="relative">
-          <LoadingSpinner size="xl" className="mx-auto" />
-          <div className="absolute inset-0 blur-2xl bg-[#6366f1]/20 rounded-full animate-breathe" />
+    <div className="min-h-screen flex items-center justify-center bg-[#06060a] relative overflow-hidden">
+      {/* Ambient background */}
+      <div className="absolute inset-0 pointer-events-none">
+        <div className="absolute top-1/2 left-1/2 -translate-x-1/2 -translate-y-1/2 w-[400px] h-[400px] bg-[rgba(99,102,241,0.05)] rounded-full blur-[100px]" />
+      </div>
+      
+      <div className="text-center relative z-10">
+        {/* Logo with wave reveal animation */}
+        <div className="relative w-24 h-24 mx-auto mb-6">
+          <img 
+            src="/logo-buggy.svg" 
+            alt="Cpt Buggy" 
+            className="w-full h-full object-contain animate-wave-reveal"
+          />
+          {/* Glow effect */}
+          <div className="absolute inset-0 blur-2xl bg-[#ef4444]/10 rounded-full animate-breathe" />
         </div>
-        {text && <p className="text-[#4a4a58] mt-5 text-[12px]">{text}</p>}
+        
+        {/* Text with staggered fade */}
+        <div className="flex items-center justify-center gap-1 text-[#6b6b7b] text-sm font-medium animate-fade-in-delayed">
+          <span className="text-[#f0f0f5]">Cpt</span>
+          <span className="text-[#ef4444]">Buggy</span>
+        </div>
+        
+        {text && <p className="text-[#4a4a58] mt-4 text-xs animate-fade-in-delayed-2">{text}</p>}
       </div>
     </div>
   )

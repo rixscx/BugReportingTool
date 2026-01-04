@@ -92,7 +92,7 @@ class ErrorBoundary extends React.Component {
             <div className="flex gap-3 mt-6">
               <button
                 onClick={() => window.location.href = '/'}
-                className="px-5 py-2.5 bg-gradient-to-r from-[#6366f1] to-[#8b5cf6] text-white text-[13px] font-medium rounded-xl hover:shadow-[0_8px_30px_rgba(99,102,241,0.3)] hover:-translate-y-0.5 transition-all duration-300"
+                className="px-5 py-2.5 bg-gradient-to-r from-[#ef4444] to-[#f97316] text-white text-[13px] font-medium rounded-xl hover:shadow-[0_8px_30px_rgba(239,68,68,0.3)] hover:-translate-y-0.5 transition-all duration-300"
               >
                 Go to Dashboard
               </button>

@@ -523,6 +523,50 @@ select:focus-visible {
   animation: pulse-soft 3s ease-in-out infinite;
 }
 
+/* Wave reveal animation for logo loading */
+@keyframes wave-reveal {
+  0% {
+    opacity: 0;
+    clip-path: inset(100% 0 0 0);
+    transform: scale(0.9);
+  }
+  50% {
+    opacity: 0.5;
+    clip-path: inset(50% 0 0 0);
+    transform: scale(0.95);
+  }
+  100% {
+    opacity: 1;
+    clip-path: inset(0 0 0 0);
+    transform: scale(1);
+  }
+}
+
+@keyframes fade-in-delayed {
+  0% {
+    opacity: 0;
+    transform: translateY(10px);
+  }
+  100% {
+    opacity: 1;
+    transform: translateY(0);
+  }
+}
+
+.animate-wave-reveal {
+  animation: wave-reveal 1.2s cubic-bezier(0.25, 0.46, 0.45, 0.94) forwards;
+}
+
+.animate-fade-in-delayed {
+  opacity: 0;
+  animation: fade-in-delayed 0.6s ease-out 0.8s forwards;
+}
+
+.animate-fade-in-delayed-2 {
+  opacity: 0;
+  animation: fade-in-delayed 0.6s ease-out 1.2s forwards;
+}
+
 .animate-bounce-dot {
   animation: bounce-dot 1.4s ease-in-out infinite;
 }
@@ -611,6 +655,7 @@ select:focus-visible {
 .line-clamp-1 {
   display: -webkit-box;
   -webkit-line-clamp: 1;
+  line-clamp: 1;
   -webkit-box-orient: vertical;
   overflow: hidden;
 }
@@ -618,6 +663,7 @@ select:focus-visible {
 .line-clamp-2 {
   display: -webkit-box;
   -webkit-line-clamp: 2;
+  line-clamp: 2;
   -webkit-box-orient: vertical;
   overflow: hidden;
 }
@@ -625,6 +671,7 @@ select:focus-visible {
 .line-clamp-3 {
   display: -webkit-box;
   -webkit-line-clamp: 3;
+  line-clamp: 3;
   -webkit-box-orient: vertical;
   overflow: hidden;
 }
@@ -952,6 +999,7 @@ select:focus-visible {
   padding: 1px;
   background: linear-gradient(135deg, rgba(255, 255, 255, 0.15), rgba(255, 255, 255, 0.03), rgba(99, 102, 241, 0.2));
   -webkit-mask: linear-gradient(#fff 0 0) content-box, linear-gradient(#fff 0 0);
+  mask: linear-gradient(#fff 0 0) content-box, linear-gradient(#fff 0 0);
   -webkit-mask-composite: xor;
   mask-composite: exclude;
   pointer-events: none;
@@ -973,6 +1021,7 @@ select:focus-visible {
   background-size: 200% 100%;
   animation: border-flow 3s linear infinite;
   -webkit-mask: linear-gradient(#fff 0 0) content-box, linear-gradient(#fff 0 0);
+  mask: linear-gradient(#fff 0 0) content-box, linear-gradient(#fff 0 0);
   -webkit-mask-composite: xor;
   mask-composite: exclude;
   pointer-events: none;
