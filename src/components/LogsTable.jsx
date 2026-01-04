@@ -1,80 +1,96 @@
 import { Link } from 'react-router-dom'
 
+const actionConfig = {
+    bug_created: { label: 'Created', color: '#22c55e' },
+    bug_status_changed: { label: 'Status', color: '#6366f1' },
+    bug_archived: { label: 'Archived', color: '#eab308' },
+    bug_restored: { label: 'Restored', color: '#6366f1' },
+    deleted: { label: 'Deleted', color: '#ef4444' },
+    comment_created: { label: 'Comment', color: '#8b5cf6' },
+    comment_updated: { label: 'Edited', color: '#4a4a58' },
+    comment_deleted: { label: 'Removed', color: '#ef4444' },
+}
+
 export default function LogsTable({ activities }) {
     if (!activities || activities.length === 0) {
         return (
-            <div className="bg-white rounded-xl border border-slate-200 p-12 text-center text-slate-500">
-                No logs found matching criteria
+            <div className="text-center py-16">
+                <div className="w-16 h-16 mx-auto mb-4 rounded-2xl bg-[rgba(99,102,241,0.1)] flex items-center justify-center">
+                    <svg className="w-8 h-8 text-[#4a4a58]" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1.5} d="M3 10h18M3 14h18m-9-4v8m-7 0h14a2 2 0 002-2V8a2 2 0 00-2-2H5a2 2 0 00-2 2v8a2 2 0 002 2z" />
+                    </svg>
+                </div>
+                <div className="text-[14px] text-[#6b6b7b]">No logs found</div>
             </div>
         )
     }
 
     return (
-        <div className="bg-white rounded-xl border border-slate-200 overflow-hidden shadow-sm">
+        <div className="overflow-hidden rounded-2xl border border-[rgba(255,255,255,0.06)]">
             <div className="overflow-x-auto">
-                <table className="w-full text-left text-xs">
+                <table className="w-full">
                     <thead>
-                        <tr className="bg-slate-50 border-b border-slate-200 text-slate-500 font-medium uppercase tracking-wider">
-                            <th className="px-6 py-4">Timestamp</th>
-                            <th className="px-6 py-4">Actor</th>
-                            <th className="px-6 py-4">Action</th>
-                            <th className="px-6 py-4">Entity / Target</th>
-                            <th className="px-6 py-4">Metadata</th>
+                        <tr className="bg-[rgba(12,12,18,0.6)] text-[10px] text-[#4a4a58] uppercase tracking-widest">
+                            <th className="px-5 py-4 text-left font-medium">Time</th>
+                            <th className="px-5 py-4 text-left font-medium">User</th>
+                            <th className="px-5 py-4 text-left font-medium">Action</th>
+                            <th className="px-5 py-4 text-left font-medium">Issue</th>
+                            <th className="px-5 py-4 text-left font-medium">Details</th>
                         </tr>
                     </thead>
-                    <tbody className="divide-y divide-slate-100">
-                        {activities.map((log) => (
-                            <tr key={log.id} className="hover:bg-slate-50 transition-colors">
-                                {/* Timestamp */}
-                                <td className="px-6 py-4 whitespace-nowrap text-slate-500 font-mono">
-                                    {new Date(log.created_at).toLocaleString()}
-                                </td>
-
-                                {/* Actor */}
-                                <td className="px-6 py-4">
-                                    <div className="flex items-center gap-2">
-                                        <div className="w-6 h-6 rounded-full bg-slate-200 flex items-center justify-center text-[10px] font-bold text-slate-600">
-                                            {(log.user?.username?.[0] || log.actor_email?.[0] || log.user_id?.[0] || 'U').toUpperCase()}
-                                        </div>
-                                        <div>
-                                            {/* Name Priority: Username -> Email (prefix) -> UID -> 'System' */}
-                                            <div className="font-medium text-slate-700 text-sm">
-                                                {log.user?.username || log.actor_email || log.user_id || 'System'}
+                    <tbody>
+                        {activities.map((log, idx) => {
+                            const config = actionConfig[log.action] || { label: log.action, color: '#4a4a58' }
+                            return (
+                                <tr 
+                                    key={log.id} 
+                                    className={`hover:bg-[rgba(99,102,241,0.04)] transition-colors ${idx !== activities.length - 1 ? 'border-b border-[rgba(255,255,255,0.04)]' : ''}`}
+                                >
+                                    <td className="px-5 py-4">
+                                        <div className="text-[12px] text-[#9898a8]">{new Date(log.created_at).toLocaleDateString('en-US', { month: 'short', day: 'numeric' })}</div>
+                                        <div className="text-[10px] text-[#4a4a58] font-mono mt-0.5">{new Date(log.created_at).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}</div>
+                                    </td>
+                                    <td className="px-5 py-4">
+                                        <div className="flex items-center gap-2.5">
+                                            <div className="w-7 h-7 rounded-lg bg-gradient-to-br from-[#6366f1]/20 to-[#8b5cf6]/20 flex items-center justify-center text-[10px] font-semibold text-[#818cf8]">
+                                                {(log.user?.username || log.actor_email?.split('@')[0] || 'S')[0].toUpperCase()}
                                             </div>
-                                            {/* Subtext: ID and Email (if not main) */}
-                                            <div className="text-slate-400 text-[10px] font-mono">
-                                                UID: {(log.user_id || log.actor_id)?.slice(0, 8)}
-                                            </div>
+                                            <span className="text-[12px] text-[#f0f0f5] font-medium">{log.user?.username || log.actor_email?.split('@')[0] || 'System'}</span>
                                         </div>
-                                    </div>
-                                </td>
-
-                                {/* Action */}
-                                <td className="px-6 py-4">
-                                    <span className={`inline-flex items-center px-2 py-1 rounded border ${log.action.includes('deleted') ? 'bg-red-50 text-red-700 border-red-100' :
-                                        log.action.includes('status') ? 'bg-blue-50 text-blue-700 border-blue-100' :
-                                            log.action.includes('comment') ? 'bg-green-50 text-green-700 border-green-100' :
-                                                'bg-slate-50 text-slate-600 border-slate-200'
-                                        }`}>
-                                        {log.action}
-                                    </span>
-                                </td>
-
-                                {/* Target */}
-                                <td className="px-6 py-4 font-mono text-slate-500">
-                                    <Link to={`/bug/${log.bug_id}`} className="hover:text-blue-600 hover:underline">
-                                        {log.bug_id?.slice(0, 8)}...
-                                    </Link>
-                                </td>
-
-                                {/* Metadata */}
-                                <td className="px-6 py-4 max-w-xs">
-                                    <pre className="text-[10px] bg-slate-50 p-2 rounded border border-slate-100 overflow-x-auto">
-                                        {JSON.stringify(log.metadata, null, 2)}
-                                    </pre>
-                                </td>
-                            </tr>
-                        ))}
+                                    </td>
+                                    <td className="px-5 py-4">
+                                        <span 
+                                            className="inline-flex items-center gap-1.5 px-2.5 py-1 rounded-lg text-[11px] font-medium"
+                                            style={{ backgroundColor: `${config.color}15`, color: config.color }}
+                                        >
+                                            <span className="w-1.5 h-1.5 rounded-full" style={{ backgroundColor: config.color }} />
+                                            {config.label}
+                                        </span>
+                                    </td>
+                                    <td className="px-5 py-4">
+                                        <Link 
+                                            to={`/bug/${log.bug_id}`} 
+                                            className="text-[11px] font-mono px-2 py-1 bg-[rgba(99,102,241,0.1)] text-[#818cf8] rounded-lg hover:bg-[rgba(99,102,241,0.2)] transition-colors"
+                                        >
+                                            #{log.bug_id?.slice(0, 6)}
+                                        </Link>
+                                    </td>
+                                    <td className="px-5 py-4">
+                                        {log.metadata?.old_status && log.metadata?.new_status ? (
+                                            <div className="flex items-center gap-2 text-[11px]">
+                                                <span className="px-2 py-1 bg-[rgba(255,255,255,0.03)] rounded-lg text-[#4a4a58] line-through">{log.metadata.old_status}</span>
+                                                <svg className="w-3.5 h-3.5 text-[#4a4a58]" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M13 7l5 5m0 0l-5 5m5-5H6" />
+                                                </svg>
+                                                <span className="px-2 py-1 bg-[rgba(99,102,241,0.1)] rounded-lg text-[#9898a8]">{log.metadata.new_status}</span>
+                                            </div>
+                                        ) : (
+                                            <span className="text-[11px] text-[#35354a]">—</span>
+                                        )}
+                                    </td>
+                                </tr>
+                            )
+                        })}
                     </tbody>
                 </table>
             </div>

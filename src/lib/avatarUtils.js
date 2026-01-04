@@ -1,17 +1,107 @@
 import { generateAvatarDataURL } from './avatarGenerator.jsx'
 
 /**
- * Generate a unique avatar URL for a user
- * Uses procedural generation - same user ID always gets same avatar
- * Avatars are geometric patterns, not initials
+ * AVATAR SYSTEM - EXPLICIT TYPE-BASED RESOLUTION
+ * 
+ * Database Schema:
+ * - avatar_type: 'uploaded' | 'generated' | null
+ * - avatar_url: URL (only valid when avatar_type === 'uploaded')
+ * - avatar_seed: string (only valid when avatar_type === 'generated')
+ * - avatar_updated_at: timestamp (for cache busting)
+ * 
+ * INVARIANTS:
+ * - Avatar type is EXPLICIT, never inferred
+ * - No localStorage for avatar state
+ * - No priority-based resolution
+ * - Single source of truth: profiles table
  */
-export const generateAvatarUrl = (seed) => {
-  if (!seed) return null
-  return generateAvatarDataURL(seed, 90)
+
+/**
+ * Avatar type constants
+ */
+export const AVATAR_TYPES = {
+  UPLOADED: 'uploaded',
+  GENERATED: 'generated',
+  FALLBACK: null,
 }
 
 /**
- * Get avatar styles available
+ * SINGLE SOURCE OF TRUTH: Resolve avatar from profile data
+ * 
+ * This is the ONLY function that should be used to get avatar URLs.
+ * Uses explicit type-based logic - NO inference.
+ * 
+ * @param {Object} profile - User profile from database
+ * @returns {{ type: string, src: string | null }}
+ */
+export function resolveAvatar(profile) {
+  if (!profile) {
+    return { type: 'fallback', src: null }
+  }
+
+  // RULE 1: Uploaded avatar - explicit type check
+  if (profile.avatar_type === 'uploaded' && profile.avatar_url) {
+    // Cache-bust with avatar_updated_at timestamp
+    const cacheBuster = profile.avatar_updated_at
+      ? `?v=${new Date(profile.avatar_updated_at).getTime()}`
+      : `?v=${Date.now()}`
+
+    return {
+      type: 'uploaded',
+      src: profile.avatar_url + cacheBuster
+    }
+  }
+
+  // RULE 2: Generated avatar - explicit type check
+  if (profile.avatar_type === 'generated' && profile.avatar_seed) {
+    return {
+      type: 'generated',
+      src: generateAvatarDataURL(profile.avatar_seed, 90)
+    }
+  }
+
+  // RULE 3: Fallback - no avatar configured
+  return { type: 'fallback', src: null }
+}
+
+/**
+ * Get avatar URL for display in <img> tags
+ * Convenience wrapper around resolveAvatar
+ * 
+ * @param {Object} profile - User profile
+ * @returns {string | null} - URL or null for fallback
+ */
+export function getAvatarUrl(profile) {
+  const { src } = resolveAvatar(profile)
+  return src
+}
+
+/**
+ * Generate a new avatar seed
+ * Uses userId + timestamp for uniqueness
+ * 
+ * @param {string} userId - User ID
+ * @returns {string} - New seed
+ */
+export function generateNewAvatarSeed(userId) {
+  return `${userId}-${Date.now()}`
+}
+
+/**
+ * Generate avatar data URL from seed
+ * Uses the existing procedural generator
+ * 
+ * @param {string} seed - Avatar seed
+ * @param {number} size - Size in pixels
+ * @returns {string | null} - Data URL
+ */
+export function generateAvatarFromSeed(seed, size = 90) {
+  if (!seed) return null
+  return generateAvatarDataURL(seed, size)
+}
+
+/**
+ * Get avatar styles available (for future use)
  */
 export const AVATAR_STYLES = [
   { value: 'geometric', label: 'Geometric (Default)' },
@@ -21,39 +111,38 @@ export const AVATAR_STYLES = [
 ]
 
 /**
- * Generate avatar with custom style
- * Currently all use same algorithm, but seed is modified for variety
+ * Prepare avatar update data for database
+ * 
+ * @param {'uploaded' | 'generated' | null} type - Avatar type
+ * @param {Object} options - Options based on type
+ * @returns {Object} - Data to update in profiles table
  */
-export const generateAvatarWithStyle = (seed, style = 'geometric') => {
-  if (!seed) return null
-  
-  // Add style prefix to seed to generate different patterns
-  const styledSeed = `${style}-${seed}`
-  return generateAvatarDataURL(styledSeed, 90)
-}
+export function prepareAvatarUpdate(type, options = {}) {
+  const now = new Date().toISOString()
 
-/**
- * Resolve avatar URL based on invariant priority:
- * 1) OAuth provider avatar (if OAuth user AND provider avatar exists)
- * 2) User-uploaded avatar
- * 3) Procedural avatar for non-OAuth users only
- * 4) Otherwise null (render placeholder)
- */
-export const resolveAvatar = ({
-  oauthAvatarUrl,
-  uploadedAvatarUrl,
-  proceduralSeed,
-  forceProcedural = false,
-}) => {
-  if (oauthAvatarUrl) return oauthAvatarUrl
-
-  if (forceProcedural && proceduralSeed) {
-    return generateAvatarUrl(proceduralSeed)
+  if (type === 'uploaded') {
+    return {
+      avatar_type: 'uploaded',
+      avatar_url: options.url,
+      avatar_seed: null, // Clear seed when uploading
+      avatar_updated_at: now,
+    }
   }
 
-  if (uploadedAvatarUrl && !forceProcedural) return uploadedAvatarUrl
+  if (type === 'generated') {
+    return {
+      avatar_type: 'generated',
+      avatar_seed: options.seed,
+      avatar_url: null, // Keep old URL in storage, just don't use it
+      avatar_updated_at: now,
+    }
+  }
 
-  if (proceduralSeed) return generateAvatarUrl(proceduralSeed)
-
-  return null
+  // Reset to default
+  return {
+    avatar_type: null,
+    avatar_url: null,
+    avatar_seed: null,
+    avatar_updated_at: now,
+  }
 }

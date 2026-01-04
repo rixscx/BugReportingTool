@@ -343,10 +343,11 @@ export function PulseIndicator({
   }
 
   const colors = {
-    green: 'bg-green-500',
-    red: 'bg-red-500',
-    yellow: 'bg-yellow-500',
-    blue: 'bg-blue-500',
+    green: 'bg-[#22c55e]',
+    red: 'bg-[#ef4444]',
+    yellow: 'bg-[#f59e0b]',
+    blue: 'bg-[#6366f1]',
+    purple: 'bg-[#a855f7]',
   }
 
   if (!active) return null
@@ -354,7 +355,7 @@ export function PulseIndicator({
   return (
     <span className={`relative flex ${sizes[size]} ${className}`}>
       <span className={`animate-ping absolute inline-flex h-full w-full rounded-full ${colors[color]} opacity-75`} />
-      <span className={`relative inline-flex rounded-full ${sizes[size]} ${colors[color]}`} />
+      <span className={`relative inline-flex rounded-full ${sizes[size]} ${colors[color]} shadow-[0_0_8px_rgba(99,102,241,0.4)]`} />
     </span>
   )
 }

@@ -1,99 +1,111 @@
-import { formatSmartDate } from '../lib/dateUtils'
+import { useState } from 'react'
+
+const actionConfig = {
+    bug_created: { label: 'created', dot: 'bg-[#22c55e]', glow: 'shadow-[0_0_12px_rgba(34,197,94,0.5)]' },
+    bug_status_changed: { label: 'changed status', dot: 'bg-[#6366f1]', glow: 'shadow-[0_0_12px_rgba(99,102,241,0.5)]' },
+    bug_archived: { label: 'archived', dot: 'bg-[#eab308]', glow: 'shadow-[0_0_12px_rgba(234,179,8,0.5)]' },
+    bug_restored: { label: 'restored', dot: 'bg-[#6366f1]', glow: 'shadow-[0_0_12px_rgba(99,102,241,0.5)]' },
+    deleted: { label: 'deleted', dot: 'bg-[#ef4444]', glow: 'shadow-[0_0_12px_rgba(239,68,68,0.5)]' },
+    comment_created: { label: 'commented', dot: 'bg-[#8b5cf6]', glow: 'shadow-[0_0_12px_rgba(139,92,246,0.5)]' },
+    comment_updated: { label: 'edited comment', dot: 'bg-[#4a4a58]', glow: '' },
+    comment_deleted: { label: 'deleted comment', dot: 'bg-[#ef4444]', glow: 'shadow-[0_0_12px_rgba(239,68,68,0.5)]' },
+}
 
 export default function LogsTimeline({ activities }) {
+    const [expandedDates, setExpandedDates] = useState({})
+
     if (activities.length === 0) {
         return (
-            <div className="text-center py-12 bg-white rounded-xl border border-slate-200">
-                <p className="text-slate-500">No activity recorded yet.</p>
+            <div className="text-center py-16">
+                <div className="w-16 h-16 mx-auto mb-4 rounded-2xl bg-[rgba(99,102,241,0.1)] flex items-center justify-center">
+                    <svg className="w-8 h-8 text-[#4a4a58]" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1.5} d="M12 8v4l3 3m6-3a9 9 0 11-18 0 9 9 0 0118 0z" />
+                    </svg>
+                </div>
+                <div className="text-[14px] text-[#6b6b7b]">No activity yet</div>
+                <div className="text-[12px] text-[#4a4a58] mt-1">Events will appear here as they happen</div>
             </div>
         )
     }
 
-    // Group by date
     const grouped = activities.reduce((acc, activity) => {
-        const date = new Date(activity.created_at).toLocaleDateString()
+        const date = new Date(activity.created_at).toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric' })
         if (!acc[date]) acc[date] = []
         acc[date].push(activity)
         return acc
     }, {})
 
+    const toggleDate = (date) => setExpandedDates(prev => ({ ...prev, [date]: !prev[date] }))
+    const isExpanded = (date) => expandedDates[date] !== false
+
     return (
-        <div className="space-y-8">
+        <div className="space-y-4">
             {Object.entries(grouped).map(([date, dateActivities]) => (
-                <div key={date} className="relative">
-                    <div className="sticky top-20 z-10 bg-slate-50/95 backdrop-blur py-2 mb-4 border-b border-slate-200">
-                        <h3 className="text-sm font-semibold text-slate-500 uppercase tracking-wider">{date}</h3>
-                    </div>
+                <div key={date}>
+                    {/* Date header - floating pill */}
+                    <button 
+                        onClick={() => toggleDate(date)} 
+                        className="w-full flex items-center gap-3 mb-3 group"
+                    >
+                        <div className="flex items-center gap-2.5 px-4 py-2 bg-[rgba(12,12,18,0.6)] rounded-xl border border-[rgba(255,255,255,0.06)] group-hover:border-[rgba(255,255,255,0.1)] transition-all">
+                            <span className="text-[13px] font-medium text-[#f0f0f5]">{date}</span>
+                            <span className="text-[10px] text-[#4a4a58] bg-[rgba(255,255,255,0.05)] px-2 py-0.5 rounded-full">{dateActivities.length}</span>
+                        </div>
+                        <div className="flex-1 h-px bg-gradient-to-r from-[rgba(255,255,255,0.06)] to-transparent" />
+                        <svg className={`w-4 h-4 text-[#4a4a58] transition-transform duration-300 ${isExpanded(date) ? 'rotate-180' : ''}`} fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 9l-7 7-7-7" />
+                        </svg>
+                    </button>
 
-                    <div className="space-y-6 ml-4 border-l-2 border-slate-200 pl-6 pb-2">
-                        {dateActivities.map((activity) => (
-                            <div key={activity.id} className="relative group">
-                                {/* Connector Dot */}
-                                <div className="absolute -left-[29px] top-1.5 w-3.5 h-3.5 rounded-full border-2 border-slate-300 bg-white group-hover:border-blue-500 group-hover:scale-110 transition-all" />
-
-                                <div className="bg-white p-4 rounded-xl border border-slate-200 shadow-sm hover:shadow-md transition-shadow">
-                                    <div className="flex items-start justify-between gap-4">
-                                        <div className="flex items-center gap-3">
-                                            <div className="w-8 h-8 rounded-full bg-slate-100 flex items-center justify-center text-xs font-semibold text-slate-600">
-                                                {(activity.actor?.username || activity.actor?.email || 'U')[0].toUpperCase()}
+                    {isExpanded(date) && (
+                        <div className="ml-4 space-y-2 relative">
+                            {/* Vertical line */}
+                            <div className="absolute left-[5px] top-3 bottom-3 w-px bg-gradient-to-b from-[rgba(99,102,241,0.3)] via-[rgba(99,102,241,0.1)] to-transparent" />
+                            
+                            {dateActivities.map((activity) => {
+                                const config = actionConfig[activity.action] || { label: activity.action.replace(/_/g, ' '), dot: 'bg-[#4a4a58]', glow: '' }
+                                return (
+                                    <div 
+                                        key={activity.id} 
+                                        className="relative pl-8 py-3 hover:bg-[rgba(255,255,255,0.02)] rounded-xl transition-colors group"
+                                    >
+                                        {/* Timeline dot */}
+                                        <div className={`absolute left-0 top-[18px] w-[11px] h-[11px] rounded-full ${config.dot} ${config.glow} ring-2 ring-[#06060a] transition-transform group-hover:scale-125`} />
+                                        
+                                        <div className="flex items-center justify-between">
+                                            <div className="flex items-center gap-2.5 flex-wrap">
+                                                <span className="text-[13px] font-medium text-[#f0f0f5]">
+                                                    {activity.actor?.username || activity.actor?.email?.split('@')[0] || 'User'}
+                                                </span>
+                                                <span className="text-[12px] text-[#6b6b7b]">{config.label}</span>
+                                                <a 
+                                                    href={`/bug/${activity.bug_id}`} 
+                                                    className="text-[11px] font-mono px-2 py-0.5 bg-[rgba(99,102,241,0.1)] text-[#818cf8] rounded-lg hover:bg-[rgba(99,102,241,0.2)] transition-colors"
+                                                >
+                                                    #{activity.bug_id.slice(0, 6)}
+                                                </a>
                                             </div>
-                                            <div>
-                                                <p className="text-sm text-slate-800">
-                                                    <span className="font-medium text-slate-900">
-                                                        {activity.actor?.username || activity.actor?.email}
-                                                    </span>
-                                                    {' '}
-                                                    <span className="text-slate-600">
-                                                        {formatAction(activity)}
-                                                    </span>
-                                                </p>
-                                                <p className="text-xs text-slate-400 mt-0.5">
-                                                    {new Date(activity.created_at).toLocaleTimeString()}
-                                                </p>
+                                            <span className="text-[11px] text-[#4a4a58] tabular-nums">
+                                                {new Date(activity.created_at).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}
+                                            </span>
+                                        </div>
+                                        
+                                        {activity.metadata?.old_status && activity.metadata?.new_status && (
+                                            <div className="mt-2 flex items-center gap-2 text-[12px]">
+                                                <span className="px-2 py-1 bg-[rgba(255,255,255,0.03)] rounded-lg text-[#4a4a58] line-through">{activity.metadata.old_status}</span>
+                                                <svg className="w-4 h-4 text-[#4a4a58]" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M13 7l5 5m0 0l-5 5m5-5H6" />
+                                                </svg>
+                                                <span className="px-2 py-1 bg-[rgba(99,102,241,0.1)] rounded-lg text-[#9898a8]">{activity.metadata.new_status}</span>
                                             </div>
-                                        </div>
-                                        {/* Metadata badge or ID */}
-                                        <div className="text-xs font-mono text-slate-400 bg-slate-50 px-2 py-1 rounded">
-                                            Bug #{activity.bug_id.slice(0, 8)}
-                                        </div>
+                                        )}
                                     </div>
-
-                                    {/* Additional Context */}
-                                    {(activity.metadata?.old_status || activity.metadata?.new_status) && (
-                                        <div className="mt-3 text-sm flex items-center gap-2 bg-slate-50 p-2 rounded-lg border border-slate-100 inline-flex">
-                                            <span className="line-through text-slate-400">{activity.metadata.old_status}</span>
-                                            <svg className="w-3 h-3 text-slate-400" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                                                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M17 8l4 4m0 0l-4 4m4-4H3" />
-                                            </svg>
-                                            <span className="font-medium text-slate-700">{activity.metadata.new_status}</span>
-                                        </div>
-                                    )}
-
-                                    {activity.action === 'comment_created' && (
-                                        <div className="mt-2 text-sm text-slate-600 italic border-l-2 border-slate-100 pl-3">
-                                            "Posted a comment"
-                                        </div>
-                                    )}
-                                </div>
-                            </div>
-                        ))}
-                    </div>
+                                )
+                            })}
+                        </div>
+                    )}
                 </div>
             ))}
         </div>
     )
-}
-
-function formatAction(activity) {
-    switch (activity.action) {
-        case 'bug_created': return 'reported a new bug'
-        case 'bug_status_changed': return 'changed status'
-        case 'bug_archived': return 'archived a bug'
-        case 'bug_restored': return 'restored a bug'
-        case 'deleted': return 'deleted a bug'
-        case 'comment_created': return 'commented on'
-        case 'comment_updated': return 'edited a comment on'
-        case 'comment_deleted': return 'deleted a comment on'
-        default: return activity.action.replace(/_/g, ' ')
-    }
 }

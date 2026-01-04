@@ -5,14 +5,14 @@ export function ThemeToggle({ isDark, onToggle }) {
   return (
     <button
       onClick={onToggle}
-      className="relative p-2 rounded-lg hover:bg-gray-100 dark:hover:bg-gray-800 transition-colors group"
+      className="relative p-2.5 rounded-xl hover:bg-[rgba(99,102,241,0.1)] transition-all duration-200 group"
       aria-label={isDark ? 'Switch to light mode' : 'Switch to dark mode'}
       title={isDark ? 'Light mode' : 'Dark mode'}
     >
       <div className="relative w-5 h-5">
         {/* Sun icon */}
         <svg
-          className={`absolute inset-0 w-5 h-5 text-yellow-500 transition-all duration-300 ${
+          className={`absolute inset-0 w-5 h-5 text-[#fbbf24] transition-all duration-300 ${
             isDark ? 'opacity-0 rotate-90 scale-0' : 'opacity-100 rotate-0 scale-100'
           }`}
           fill="none"
@@ -29,7 +29,7 @@ export function ThemeToggle({ isDark, onToggle }) {
         
         {/* Moon icon */}
         <svg
-          className={`absolute inset-0 w-5 h-5 text-blue-400 transition-all duration-300 ${
+          className={`absolute inset-0 w-5 h-5 text-[#818cf8] transition-all duration-300 ${
             isDark ? 'opacity-100 rotate-0 scale-100' : 'opacity-0 -rotate-90 scale-0'
           }`}
           fill="none"
@@ -53,11 +53,11 @@ export function ThemeToggle({ isDark, onToggle }) {
  */
 export function ThemeToggleAdvanced({ isDark, onLight, onDark, onSystem }) {
   return (
-    <div className="flex items-center gap-1 p-1 bg-gray-100 dark:bg-gray-800 rounded-lg">
+    <div className="flex items-center gap-1 p-1 bg-[#0a0a0f] rounded-xl border border-[rgba(255,255,255,0.06)]">
       <button
         onClick={onLight}
-        className={`p-1.5 rounded-md transition-all ${
-          !isDark ? 'bg-white shadow-sm text-yellow-500' : 'text-gray-400 hover:text-gray-600'
+        className={`p-2 rounded-lg transition-all duration-200 ${
+          !isDark ? 'bg-[rgba(99,102,241,0.15)] shadow-[0_0_10px_rgba(99,102,241,0.2)] text-[#fbbf24]' : 'text-[#4a4a58] hover:text-[#9898a8]'
         }`}
         aria-label="Light mode"
         title="Light mode"
@@ -69,7 +69,7 @@ export function ThemeToggleAdvanced({ isDark, onLight, onDark, onSystem }) {
       
       <button
         onClick={onSystem}
-        className="p-1.5 rounded-md text-gray-400 hover:text-gray-600 transition-all"
+        className="p-2 rounded-lg text-[#4a4a58] hover:text-[#9898a8] hover:bg-[rgba(255,255,255,0.05)] transition-all duration-200"
         aria-label="System preference"
         title="System preference"
       >
@@ -80,8 +80,8 @@ export function ThemeToggleAdvanced({ isDark, onLight, onDark, onSystem }) {
       
       <button
         onClick={onDark}
-        className={`p-1.5 rounded-md transition-all ${
-          isDark ? 'bg-gray-700 shadow-sm text-blue-400' : 'text-gray-400 hover:text-gray-600'
+        className={`p-2 rounded-lg transition-all duration-200 ${
+          isDark ? 'bg-[rgba(99,102,241,0.15)] shadow-[0_0_10px_rgba(99,102,241,0.2)] text-[#818cf8]' : 'text-[#4a4a58] hover:text-[#9898a8]'
         }`}
         aria-label="Dark mode"
         title="Dark mode"

@@ -1,4 +1,4 @@
-import { useState, useEffect, useCallback, useMemo } from 'react'
+import { useState, useEffect, useCallback } from 'react'
 import { Link, useLocation, useNavigate } from 'react-router-dom'
 import { supabase } from '../lib/supabaseClient'
 import { resolveAvatar } from '../lib/avatarUtils'
@@ -11,25 +11,13 @@ export default function Navbar({ session, userProfile, isAdmin }) {
   const location = useLocation()
   const navigate = useNavigate()
   const { showToast } = useToast()
-  // PHASE 2 — PROCEDURAL AVATAR FIX: Get seed from single source of truth (useAuth)
-  const { isTestAccount, deleteAccount, proceduralAvatarSeed, proceduralAvatarOverride, loading: profileLoading = false } = useAuth()
+  const { isTestAccount, deleteAccount, loading: profileLoading = false } = useAuth()
   const deleteDialog = useConfirmDialog()
   const [showShortcutsHelp, setShowShortcutsHelp] = useState(false)
   const [showUserMenu, setShowUserMenu] = useState(false)
 
-  // PHASE 2 — PROCEDURAL AVATAR FIX: Memoize avatar URL with [proceduralAvatarSeed] dependency
-  // This ensures avatar changes when seed changes (e.g., "Generate New Avatar" clicked)
-  const provider = session?.user?.app_metadata?.provider || session?.user?.user_metadata?.provider || session?.user?.user_metadata?.iss || ''
-  const isOAuthUser = typeof provider === 'string' && provider.toLowerCase().includes('google')
-  const providerAvatarUrl = session?.user?.user_metadata?.avatar_url || null
-  const uploadedAvatarUrl = userProfile?.avatar_url || null
-
-  const resolvedAvatar = useMemo(() => resolveAvatar({
-    oauthAvatarUrl: isOAuthUser ? providerAvatarUrl : null,
-    uploadedAvatarUrl,
-    proceduralSeed: isOAuthUser ? null : proceduralAvatarSeed,
-    forceProcedural: !isOAuthUser && proceduralAvatarOverride,
-  }), [isOAuthUser, providerAvatarUrl, uploadedAvatarUrl, proceduralAvatarSeed, proceduralAvatarOverride])
+  const avatarData = resolveAvatar(userProfile)
+  const resolvedAvatarUrl = avatarData.src
 
   useEffect(() => {
     const handleOpenShortcuts = () => setShowShortcutsHelp(true)
@@ -60,24 +48,14 @@ export default function Navbar({ session, userProfile, isAdmin }) {
 
   const handleDeleteAccount = useCallback(async () => {
     const confirmed = await deleteDialog.confirm({
-      title: '⚠️ Permanently Delete Account?',
+      title: 'Delete Account',
       description: (
         <div className="space-y-3 text-left">
-          <p className="font-semibold text-red-600">This action CANNOT be undone!</p>
-          <p className="text-sm">Deleting your account will permanently remove:</p>
-          <ul className="text-sm list-disc list-inside space-y-1 text-slate-600">
-            <li>Your profile and authentication</li>
-            <li>All bugs you've created</li>
-            <li>All comments you've posted</li>
-            <li>Your uploaded avatar and files</li>
-            <li>All associated data</li>
-          </ul>
-          <p className="text-sm font-medium text-slate-700 mt-4">
-            Are you absolutely sure you want to delete your account?
-          </p>
+          <p className="text-[#ef4444]">This action cannot be undone.</p>
+          <p className="text-sm text-[#9898a8]">Deleting your account will permanently remove all your data including bugs, comments, and profile.</p>
         </div>
       ),
-      confirmText: 'Yes, Delete Everything',
+      confirmText: 'Delete Account',
       cancelText: 'Cancel',
       variant: 'danger',
     })
@@ -87,18 +65,11 @@ export default function Navbar({ session, userProfile, isAdmin }) {
     try {
       setShowUserMenu(false)
       showToast('Deleting account...', 'info')
-
       await deleteAccount()
-
-      // Success message (will show briefly before redirect)
       showToast('Account deleted successfully', 'success')
-
     } catch (err) {
       console.error('Delete account error:', err)
-      showToast(
-        err.message || 'Failed to delete account. Please try again or contact support.',
-        'error'
-      )
+      showToast(err.message || 'Failed to delete account', 'error')
     }
   }, [deleteDialog, deleteAccount, showToast])
 
@@ -115,81 +86,69 @@ export default function Navbar({ session, userProfile, isAdmin }) {
 
   const isActive = (path) => location.pathname === path
 
+  const NavLink = ({ to, children }) => (
+    <Link
+      to={to}
+      className={`relative px-4 py-2 text-[13px] font-medium rounded-xl transition-all duration-200 ${
+        isActive(to)
+          ? 'text-[#f0f0f5] bg-[rgba(255,255,255,0.06)]'
+          : 'text-[#6b6b7b] hover:text-[#9898a8] hover:bg-[rgba(255,255,255,0.03)]'
+      }`}
+    >
+      {children}
+      {isActive(to) && (
+        <span className="absolute -bottom-[9px] left-1/2 -translate-x-1/2 w-8 h-[3px] bg-gradient-to-r from-[#6366f1] to-[#8b5cf6] rounded-full" />
+      )}
+    </Link>
+  )
+
   return (
     <>
-      <nav className="bg-white/80 backdrop-blur-lg border-b border-slate-200/80 sticky top-0 z-40">
-        <div className="px-4 sm:px-6 lg:px-8">
-          <div className="flex justify-between h-16 items-center">
-            {/* Left - Logo & Nav */}
+      <header className="sticky top-0 z-40 border-b border-[rgba(255,255,255,0.05)]">
+        {/* Glassmorphism background */}
+        <div className="absolute inset-0 bg-[#06060a]/70 backdrop-blur-2xl" />
+        
+        {/* Ambient gradient */}
+        <div className="absolute inset-0 bg-gradient-to-r from-[rgba(99,102,241,0.03)] via-transparent to-[rgba(139,92,246,0.03)] pointer-events-none" />
+        
+        <div className="relative w-full px-4 sm:px-6 lg:px-10">
+          <div className="flex items-center justify-between h-16">
+            {/* Left: Logo + Nav - pushed to left edge */}
             <div className="flex items-center gap-8">
-              <Link to="/" className="flex items-center gap-2.5 group">
-                <div className="w-9 h-9 bg-gradient-to-br from-blue-600 to-indigo-600 rounded-xl flex items-center justify-center shadow-lg shadow-blue-500/25 group-hover:shadow-blue-500/40 transition-shadow">
-                  <svg className="w-5 h-5 text-white" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 19l9 2-9-18-9 18 9-2zm0 0v-8" />
+              <Link to="/" className="flex items-center gap-3 group">
+                <div className="relative w-9 h-9 rounded-2xl bg-gradient-to-br from-[#6366f1] via-[#8b5cf6] to-[#a855f7] flex items-center justify-center shadow-[0_4px_20px_rgba(99,102,241,0.4)] group-hover:shadow-[0_8px_30px_rgba(99,102,241,0.5)] transition-all duration-300 group-hover:scale-105">
+                  {/* Inner glow */}
+                  <div className="absolute inset-[1px] rounded-2xl bg-gradient-to-br from-white/20 to-transparent" />
+                  <svg className="relative w-5 h-5 text-white" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5">
+                    <circle cx="12" cy="12" r="10" />
+                    <path d="M12 8v4M12 16h.01" strokeLinecap="round" />
                   </svg>
                 </div>
-                <span className="text-lg font-bold text-slate-800 hidden sm:block">BugTracker</span>
+                <span className="text-[16px] font-semibold text-[#f0f0f5] hidden sm:block tracking-[-0.02em]">BugTracker</span>
               </Link>
 
-              <div className="hidden sm:flex items-center gap-1">
-                <Link
-                  to="/"
-                  className={`px-4 py-2 rounded-lg text-sm font-medium transition-all ${isActive('/')
-                      ? 'bg-slate-100 text-slate-900'
-                      : 'text-slate-600 hover:text-slate-900 hover:bg-slate-50'
-                    }`}
-                >
-                  Dashboard
-                </Link>
-                <Link
-                  to="/create"
-                  className={`px-4 py-2 rounded-lg text-sm font-medium transition-all ${isActive('/create')
-                      ? 'bg-slate-100 text-slate-900'
-                      : 'text-slate-600 hover:text-slate-900 hover:bg-slate-50'
-                    }`}
-                >
-                  Report Bug
-                </Link>
-                <Link
-                  to="/logs"
-                  className={`px-4 py-2 rounded-lg text-sm font-medium transition-all ${isActive('/logs')
-                      ? 'bg-slate-100 text-slate-900'
-                      : 'text-slate-600 hover:text-slate-900 hover:bg-slate-50'
-                    }`}
-                >
-                  Logs
-                </Link>
-              </div>
+              <nav className="hidden sm:flex items-center gap-1">
+                <NavLink to="/">Notice</NavLink>
+                <NavLink to="/issue">Issue</NavLink>
+                <NavLink to="/logs">Activity</NavLink>
+              </nav>
             </div>
 
-            {/* Right - Actions */}
-            <div className="flex items-center gap-2">
-              {/* Quick Actions */}
+            {/* Right: Actions - pushed to right edge */}
+            <div className="flex items-center gap-3">
               <button
                 onClick={() => window.dispatchEvent(new CustomEvent('open-quick-actions'))}
-                className="hidden md:flex items-center gap-2 px-3.5 py-2 text-sm text-slate-500 bg-slate-100/80 hover:bg-slate-200/80 rounded-lg transition-all border border-slate-200/50"
+                className="hidden md:flex items-center gap-3 h-9 px-4 text-[12px] text-[#6b6b7b] bg-[rgba(255,255,255,0.03)] hover:bg-[rgba(255,255,255,0.06)] border border-[rgba(255,255,255,0.06)] hover:border-[rgba(255,255,255,0.1)] rounded-2xl transition-all duration-200"
               >
-                <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                <svg className="w-4 h-4 opacity-60" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                   <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M21 21l-6-6m2-5a7 7 0 11-14 0 7 7 0 0114 0z" />
                 </svg>
-                <span className="font-medium">Search</span>
-                <kbd className="text-xs bg-white px-1.5 py-0.5 rounded border border-slate-200 text-slate-400 font-semibold">⌘K</kbd>
+                <span>Search</span>
+                <kbd className="text-[10px] px-2 py-1 bg-[rgba(255,255,255,0.05)] rounded-lg text-[#4a4a58] font-medium">⌘K</kbd>
               </button>
 
-              {/* Help */}
-              <button
-                onClick={() => setShowShortcutsHelp(true)}
-                className="p-2.5 text-slate-500 hover:text-slate-700 hover:bg-slate-100 rounded-lg transition-all"
-                title="Keyboard shortcuts (Ctrl+/)"
-              >
-                <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M8.228 9c.549-1.165 2.03-2 3.772-2 2.21 0 4 1.343 4 3 0 1.4-1.278 2.575-3.006 2.907-.542.104-.994.54-.994 1.093m0 3h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z" />
-                </svg>
-              </button>
-
-              {/* Admin Badge */}
               {isAdmin && (
-                <span className="hidden sm:inline-flex items-center px-2.5 py-1 text-xs font-semibold bg-gradient-to-r from-purple-100 to-indigo-100 text-purple-700 rounded-lg border border-purple-200">
+                <span className="hidden sm:inline-flex px-3 py-1 text-[10px] font-semibold text-[#6366f1] bg-[rgba(99,102,241,0.12)] border border-[rgba(99,102,241,0.2)] rounded-full">
                   Admin
                 </span>
               )}
@@ -198,104 +157,76 @@ export default function Navbar({ session, userProfile, isAdmin }) {
               <div className="relative" data-user-menu>
                 <button
                   onClick={() => setShowUserMenu(!showUserMenu)}
-                  className="flex items-center gap-2 p-1.5 rounded-xl hover:bg-slate-100 transition-all"
+                  className="flex items-center gap-2.5 p-1.5 rounded-2xl hover:bg-[rgba(255,255,255,0.05)] transition-all duration-200"
                 >
-                  {/* PHASE 2 — PROCEDURAL AVATAR FIX: Render gating to prevent flicker */}
                   {profileLoading ? (
-                    <div className="w-9 h-9 rounded-xl bg-slate-200 animate-pulse" />
-                  ) : resolvedAvatar ? (
-                    <img
-                      src={resolvedAvatar}
-                      alt={userProfile?.username || 'User'}
-                      className="w-9 h-9 rounded-xl ring-2 ring-white shadow-md"
-                      loading="lazy"
-                    />
+                    <div className="w-8 h-8 rounded-xl bg-[#14141c] animate-pulse" />
+                  ) : resolvedAvatarUrl ? (
+                    <img src={resolvedAvatarUrl} alt="" className="w-8 h-8 rounded-xl ring-2 ring-[rgba(255,255,255,0.08)]" />
                   ) : (
-                    <div className="w-9 h-9 rounded-xl bg-slate-200" />
+                    <div className="w-8 h-8 rounded-xl bg-gradient-to-br from-[#6366f1] to-[#8b5cf6] flex items-center justify-center text-[12px] font-semibold text-white ring-2 ring-[rgba(255,255,255,0.08)]">
+                      {(userProfile?.username || session?.user?.email || 'U')[0].toUpperCase()}
+                    </div>
                   )}
-                  <svg className={`w-4 h-4 text-slate-400 transition-transform duration-200 ${showUserMenu ? 'rotate-180' : ''}`} fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                  <svg className={`w-3.5 h-3.5 text-[#4a4a58] transition-transform duration-200 ${showUserMenu ? 'rotate-180' : ''}`} fill="none" stroke="currentColor" viewBox="0 0 24 24">
                     <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 9l-7 7-7-7" />
                   </svg>
                 </button>
 
                 {showUserMenu && (
-                  <div className="absolute right-0 mt-2 w-64 bg-white rounded-xl shadow-xl border border-slate-200 py-2 z-50 animate-fade-in-scale">
-                    <div className="px-4 py-3 border-b border-slate-100 flex items-center gap-3">
-                      {/* PHASE 2 — PROCEDURAL AVATAR FIX: Render gating to prevent flicker */}
-                      {profileLoading ? (
-                        <div className="w-10 h-10 rounded-lg bg-slate-200 animate-pulse" />
-                      ) : resolvedAvatar ? (
-                        <img
-                          src={resolvedAvatar}
-                          alt={userProfile?.username || 'User'}
-                          className="w-10 h-10 rounded-lg ring-1 ring-slate-200"
-                          loading="lazy"
-                        />
-                      ) : (
-                        <div className="w-10 h-10 rounded-lg bg-slate-200" />
-                      )}
-                      <div className="flex-1 min-w-0">
-                        <p className="text-sm font-semibold text-slate-900 truncate">
-                          {userProfile?.username || 'User'}
-                        </p>
-                        <p className="text-xs text-slate-500 truncate">
-                          {session?.user?.email}
-                        </p>
-                      </div>
+                  <div className="absolute right-0 mt-3 w-60 bg-[#0a0a0f]/95 backdrop-blur-2xl border border-[rgba(255,255,255,0.08)] rounded-2xl shadow-[0_16px_48px_rgba(0,0,0,0.5)] py-2 animate-slide-up-spring overflow-hidden">
+                    {/* Gradient accent */}
+                    <div className="absolute top-0 left-0 right-0 h-px bg-gradient-to-r from-transparent via-[rgba(99,102,241,0.4)] to-transparent" />
+                    
+                    <div className="px-4 py-3 border-b border-[rgba(255,255,255,0.06)]">
+                      <p className="text-[13px] font-semibold text-[#f0f0f5] truncate">{userProfile?.username || 'User'}</p>
+                      <p className="text-[11px] text-[#6b6b7b] truncate mt-0.5">{session?.user?.email}</p>
                     </div>
 
-                    <button
-                      onClick={() => {
-                        navigate('/edit-profile')
-                        setShowUserMenu(false)
-                      }}
-                      className="w-full px-4 py-2.5 text-left text-sm text-slate-700 hover:bg-slate-50 flex items-center gap-2.5 transition-colors"
-                    >
-                      <svg className="w-4 h-4 text-slate-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M11 5H6a2 2 0 00-2 2v11a2 2 0 002 2h11a2 2 0 002-2v-5m-1.414-9.414a2 2 0 112.828 2.828L11.828 15H9v-2.828l8.586-8.586z" />
-                      </svg>
-                      Edit Profile
-                    </button>
-
-                    <button
-                      onClick={() => {
-                        setShowShortcutsHelp(true)
-                        setShowUserMenu(false)
-                      }}
-                      className="w-full px-4 py-2.5 text-left text-sm text-slate-700 hover:bg-slate-50 flex items-center justify-between transition-colors"
-                    >
-                      <span className="flex items-center gap-2.5">
-                        <svg className="w-4 h-4 text-slate-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                          <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 3v1m0 16v1m9-9h-1M4 12H3m15.364 6.364l-.707-.707M6.343 6.343l-.707-.707m12.728 0l-.707.707M6.343 17.657l-.707.707" />
+                    <div className="py-1.5">
+                      <button
+                        onClick={() => { navigate('/edit-profile'); setShowUserMenu(false) }}
+                        className="w-full px-4 py-2.5 text-left text-[12px] text-[#9898a8] hover:bg-[rgba(255,255,255,0.05)] hover:text-[#f0f0f5] transition-colors flex items-center gap-3"
+                      >
+                        <svg className="w-4 h-4 opacity-60" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                          <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1.5} d="M10.325 4.317c.426-1.756 2.924-1.756 3.35 0a1.724 1.724 0 002.573 1.066c1.543-.94 3.31.826 2.37 2.37a1.724 1.724 0 001.065 2.572c1.756.426 1.756 2.924 0 3.35a1.724 1.724 0 00-1.066 2.573c.94 1.543-.826 3.31-2.37 2.37a1.724 1.724 0 00-2.572 1.065c-.426 1.756-2.924 1.756-3.35 0a1.724 1.724 0 00-2.573-1.066c-1.543.94-3.31-.826-2.37-2.37a1.724 1.724 0 00-1.065-2.572c-1.756-.426-1.756-2.924 0-3.35a1.724 1.724 0 001.066-2.573c-.94-1.543.826-3.31 2.37-2.37.996.608 2.296.07 2.572-1.065z" />
+                          <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1.5} d="M15 12a3 3 0 11-6 0 3 3 0 016 0z" />
                         </svg>
-                        Keyboard Shortcuts
-                      </span>
-                      <kbd className="text-xs bg-slate-100 px-2 py-1 rounded-md text-slate-500 font-semibold">Ctrl+/</kbd>
-                    </button>
+                        Settings
+                      </button>
+                      <button
+                        onClick={() => { setShowShortcutsHelp(true); setShowUserMenu(false) }}
+                        className="w-full px-4 py-2.5 text-left text-[12px] text-[#9898a8] hover:bg-[rgba(255,255,255,0.05)] hover:text-[#f0f0f5] transition-colors flex items-center justify-between"
+                      >
+                        <span className="flex items-center gap-3">
+                          <svg className="w-4 h-4 opacity-60" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1.5} d="M12 3v1m0 16v1m9-9h-1M4 12H3m15.364 6.364l-.707-.707M6.343 6.343l-.707-.707m12.728 0l-.707.707M6.343 17.657l-.707.707" />
+                          </svg>
+                          Shortcuts
+                        </span>
+                        <kbd className="text-[10px] px-2 py-0.5 bg-[rgba(255,255,255,0.05)] rounded-lg text-[#4a4a58]">?</kbd>
+                      </button>
+                    </div>
 
-                    <div className="border-t border-slate-100 mt-1 pt-1">
+                    <div className="border-t border-[rgba(255,255,255,0.06)] py-1.5">
                       <button
                         onClick={handleSignOut}
-                        className="w-full px-4 py-2.5 text-left text-sm text-red-600 hover:bg-red-50 flex items-center justify-between transition-colors"
+                        className="w-full px-4 py-2.5 text-left text-[12px] text-[#9898a8] hover:bg-[rgba(255,255,255,0.05)] hover:text-[#f0f0f5] transition-colors flex items-center gap-3"
                       >
-                        <span className="flex items-center gap-2.5">
-                          <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M17 16l4-4m0 0l-4-4m4 4H7m6 4v1a3 3 0 01-3 3H6a3 3 0 01-3-3V7a3 3 0 013-3h4a3 3 0 013 3v1" />
-                          </svg>
-                          Sign Out
-                        </span>
-                        <kbd className="text-xs bg-red-100 px-2 py-1 rounded-md text-red-500 font-semibold">Ctrl+Shift+X</kbd>
+                        <svg className="w-4 h-4 opacity-60" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                          <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1.5} d="M17 16l4-4m0 0l-4-4m4 4H7m6 4v1a3 3 0 01-3 3H6a3 3 0 01-3-3V7a3 3 0 013-3h4a3 3 0 013 3v1" />
+                        </svg>
+                        Sign out
                       </button>
-
                       {!isTestAccount && (
                         <button
                           onClick={handleDeleteAccount}
-                          className="w-full px-4 py-2.5 text-left text-sm text-red-700 hover:bg-red-50 flex items-center gap-2.5 transition-colors"
+                          className="w-full px-4 py-2.5 text-left text-[12px] text-[#ef4444] hover:bg-[rgba(239,68,68,0.08)] transition-colors flex items-center gap-3"
                         >
-                          <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16" />
+                          <svg className="w-4 h-4 opacity-70" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1.5} d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16" />
                           </svg>
-                          Delete Account
+                          Delete account
                         </button>
                       )}
                     </div>
@@ -307,35 +238,29 @@ export default function Navbar({ session, userProfile, isAdmin }) {
         </div>
 
         {/* Mobile Nav */}
-        <div className="sm:hidden border-t border-slate-100 px-4 py-2 flex items-center justify-around bg-slate-50">
-          <Link
-            to="/"
-            className={`flex flex-col items-center gap-0.5 px-4 py-1.5 rounded-md ${isActive('/') ? 'text-blue-600' : 'text-slate-500'
-              }`}
-          >
-            <svg className="w-5 h-5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M3 12l2-2m0 0l7-7 7 7M5 10v10a1 1 0 001 1h3m10-11l2 2m-2-2v10a1 1 0 01-1 1h-3m-6 0a1 1 0 001-1v-4a1 1 0 011-1h2a1 1 0 011 1v4a1 1 0 001 1m-6 0h6" />
+        <div className="relative sm:hidden border-t border-[rgba(255,255,255,0.05)] px-2 py-2 flex justify-around bg-[#06060a]/90 backdrop-blur-xl">
+          <Link to="/" className={`flex flex-col items-center py-2 px-5 rounded-xl transition-all duration-200 ${isActive('/') ? 'text-[#f0f0f5] bg-[rgba(255,255,255,0.06)]' : 'text-[#4a4a58]'}`}>
+            <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1.5} d="M19 11H5m14 0a2 2 0 012 2v6a2 2 0 01-2 2H5a2 2 0 01-2-2v-6a2 2 0 012-2m14 0V9a2 2 0 00-2-2M5 11V9a2 2 0 012-2m0 0V5a2 2 0 012-2h6a2 2 0 012 2v2M7 7h10" />
             </svg>
-            <span className="text-xs font-medium">Home</span>
+            <span className="text-[10px] mt-1 font-medium">Notice</span>
           </Link>
-          <Link
-            to="/create"
-            className={`flex flex-col items-center gap-0.5 px-4 py-1.5 rounded-md ${isActive('/create') ? 'text-blue-600' : 'text-slate-500'
-              }`}
-          >
-            <svg className="w-5 h-5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 4v16m8-8H4" />
+          <Link to="/issue" className={`flex flex-col items-center py-2 px-5 rounded-xl transition-all duration-200 ${isActive('/issue') ? 'text-[#f0f0f5] bg-[rgba(255,255,255,0.06)]' : 'text-[#4a4a58]'}`}>
+            <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1.5} d="M12 4v16m8-8H4" />
             </svg>
-            <span className="text-xs font-medium">Report</span>
+            <span className="text-[10px] mt-1 font-medium">Issue</span>
+          </Link>
+          <Link to="/logs" className={`flex flex-col items-center py-2 px-5 rounded-xl transition-all duration-200 ${isActive('/logs') ? 'text-[#f0f0f5] bg-[rgba(255,255,255,0.06)]' : 'text-[#4a4a58]'}`}>
+            <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1.5} d="M12 8v4l3 3m6-3a9 9 0 11-18 0 9 9 0 0118 0z" />
+            </svg>
+            <span className="text-[10px] mt-1 font-medium">Activity</span>
           </Link>
         </div>
-      </nav>
+      </header>
 
-      <KeyboardShortcutsHelp
-        isOpen={showShortcutsHelp}
-        onClose={() => setShowShortcutsHelp(false)}
-      />
-
+      <KeyboardShortcutsHelp isOpen={showShortcutsHelp} onClose={() => setShowShortcutsHelp(false)} />
       <ConfirmDialog {...deleteDialog.dialogProps} />
     </>
   )

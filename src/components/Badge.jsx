@@ -1,87 +1,25 @@
-/**
- * Badge component for labels and status indicators
- */
-export function Badge({
-  children,
-  variant = 'default', // 'default' | 'outline' | 'secondary'
-  color = 'gray', // 'gray' | 'red' | 'green' | 'blue' | 'yellow' | 'purple' | 'indigo'
-  size = 'sm', // 'xs' | 'sm' | 'md'
-  dot = false,
-  className = '',
-}) {
-  const colorClasses = {
-    gray: {
-      default: 'bg-gray-100 text-gray-700',
-      outline: 'border border-gray-300 text-gray-700',
-      secondary: 'bg-gray-50 text-gray-600',
-    },
-    red: {
-      default: 'bg-red-100 text-red-700',
-      outline: 'border border-red-300 text-red-700',
-      secondary: 'bg-red-50 text-red-600',
-    },
-    green: {
-      default: 'bg-green-100 text-green-700',
-      outline: 'border border-green-300 text-green-700',
-      secondary: 'bg-green-50 text-green-600',
-    },
-    blue: {
-      default: 'bg-blue-100 text-blue-700',
-      outline: 'border border-blue-300 text-blue-700',
-      secondary: 'bg-blue-50 text-blue-600',
-    },
-    yellow: {
-      default: 'bg-yellow-100 text-yellow-700',
-      outline: 'border border-yellow-300 text-yellow-700',
-      secondary: 'bg-yellow-50 text-yellow-600',
-    },
-    purple: {
-      default: 'bg-purple-100 text-purple-700',
-      outline: 'border border-purple-300 text-purple-700',
-      secondary: 'bg-purple-50 text-purple-600',
-    },
-    indigo: {
-      default: 'bg-indigo-100 text-indigo-700',
-      outline: 'border border-indigo-300 text-indigo-700',
-      secondary: 'bg-indigo-50 text-indigo-600',
-    },
-  };
+export function Badge({ children, variant = 'default', size = 'sm', dot = false, className = '' }) {
+  const variantClasses = {
+    default: 'bg-[#14141c] text-[#9898a8] border border-[rgba(255,255,255,0.08)]',
+    outline: 'border border-[rgba(255,255,255,0.1)] text-[#9898a8]',
+    secondary: 'bg-[rgba(99,102,241,0.1)] text-[#818cf8] border border-[rgba(99,102,241,0.2)]',
+    accent: 'bg-gradient-to-r from-[rgba(99,102,241,0.15)] to-[rgba(139,92,246,0.15)] text-[#a78bfa] border border-[rgba(99,102,241,0.2)]',
+  }
 
   const sizeClasses = {
-    xs: 'px-1.5 py-0.5 text-xs',
-    sm: 'px-2 py-0.5 text-xs',
-    md: 'px-2.5 py-1 text-sm',
-  };
-
-  const dotColors = {
-    gray: 'bg-gray-500',
-    red: 'bg-red-500',
-    green: 'bg-green-500',
-    blue: 'bg-blue-500',
-    yellow: 'bg-yellow-500',
-    purple: 'bg-purple-500',
-    indigo: 'bg-indigo-500',
-  };
+    xs: 'px-2 py-0.5 text-[10px]',
+    sm: 'px-2.5 py-1 text-[11px]',
+    md: 'px-3 py-1.5 text-[12px]',
+  }
 
   return (
-    <span
-      className={`inline-flex items-center gap-1.5 font-medium rounded-full ${colorClasses[color][variant]} ${sizeClasses[size]} ${className}`}
-    >
-      {dot && (
-        <span className={`w-1.5 h-1.5 rounded-full ${dotColors[color]}`} />
-      )}
+    <span className={`inline-flex items-center gap-1.5 font-medium rounded-lg ${variantClasses[variant]} ${sizeClasses[size]} ${className}`}>
+      {dot && <span className="w-1.5 h-1.5 rounded-full bg-current opacity-60" />}
       {children}
     </span>
-  );
+  )
 }
 
-/**
- * Badge group for displaying multiple badges
- */
 export function BadgeGroup({ children, className = '' }) {
-  return (
-    <div className={`flex flex-wrap gap-1 ${className}`}>
-      {children}
-    </div>
-  );
+  return <div className={`flex flex-wrap gap-1.5 ${className}`}>{children}</div>
 }

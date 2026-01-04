@@ -103,16 +103,18 @@ export function generateReport(bugs) {
 // Export Menu Component
 export function ExportMenu({ bugs, onClose }) {
   return (
-    <div className="absolute right-0 mt-2 w-48 bg-white rounded-lg shadow-lg border border-slate-200 py-1 z-50">
+    <div className="absolute right-0 mt-2 w-52 bg-[rgba(12,12,18,0.95)] rounded-2xl shadow-[0_16px_48px_rgba(0,0,0,0.4)] border border-[rgba(255,255,255,0.08)] py-2 z-50 backdrop-blur-2xl overflow-hidden animate-slide-up-spring">
+      {/* Top gradient accent */}
+      <div className="absolute top-0 left-4 right-4 h-px bg-gradient-to-r from-transparent via-[rgba(255,255,255,0.1)] to-transparent" />
       <button
         onClick={() => {
           exportToCSV(bugs)
           onClose()
         }}
-        className="w-full px-4 py-2 text-left text-sm text-slate-700 hover:bg-slate-50 flex items-center gap-2"
+        className="w-full px-4 py-2.5 text-left text-[13px] text-[#9898a8] hover:bg-[rgba(99,102,241,0.1)] hover:text-[#f0f0f5] flex items-center gap-3 transition-all duration-150"
       >
-        <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-          <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 17v-2m3 2v-4m3 4v-6m2 10H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z" />
+        <svg className="w-4 h-4 opacity-60" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+          <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1.5} d="M9 17v-2m3 2v-4m3 4v-6m2 10H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z" />
         </svg>
         Export as CSV
       </button>
@@ -121,10 +123,10 @@ export function ExportMenu({ bugs, onClose }) {
           exportToJSON(bugs)
           onClose()
         }}
-        className="w-full px-4 py-2 text-left text-sm text-slate-700 hover:bg-slate-50 flex items-center gap-2"
+        className="w-full px-4 py-2.5 text-left text-[13px] text-[#9898a8] hover:bg-[rgba(99,102,241,0.1)] hover:text-[#f0f0f5] flex items-center gap-3 transition-all duration-150"
       >
-        <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-          <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M10 20l4-16m4 4l4 4-4 4M6 16l-4-4 4-4" />
+        <svg className="w-4 h-4 opacity-60" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+          <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1.5} d="M10 20l4-16m4 4l4 4-4 4M6 16l-4-4 4-4" />
         </svg>
         Export as JSON
       </button>

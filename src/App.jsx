@@ -1,6 +1,6 @@
-import { BrowserRouter, Routes, Route, Navigate } from 'react-router-dom'
+import { BrowserRouter, Routes, Route, Navigate, useLocation } from 'react-router-dom'
 import { lazy, Suspense } from 'react'
-import { useAuth } from './hooks/useAuth'
+import { useAuth, AuthProvider } from './hooks/useAuth'
 import { useBugs } from './hooks/useBugs'
 import { ToastProvider } from './components/Toast'
 import { PageLoader } from './components/Skeleton'
@@ -10,10 +10,11 @@ import { initWatermark } from './lib/watermark'
 import ErrorBoundary from './components/ErrorBoundary' // PHASE 3 — ERROR BOUNDARY
 import Auth from './components/Auth'
 import Navbar from './components/Navbar'
+import { AnimatePresence } from './lib/motion'
 
 // Lazy load pages for code splitting
-const Dashboard = lazy(() => import('./pages/Dashboard'))
-const CreateBug = lazy(() => import('./pages/CreateBug'))
+const Notice = lazy(() => import('./pages/Notice'))
+const Issue = lazy(() => import('./pages/Issue'))
 const BugDetail = lazy(() => import('./pages/BugDetail'))
 const EditProfile = lazy(() => import('./pages/EditProfile'))
 const Logs = lazy(() => import('./pages/Logs'))
@@ -24,6 +25,7 @@ if (typeof window !== 'undefined') {
 
 function AuthenticatedApp({ session, userProfile, isAdmin }) {
   const { bugs } = useBugs()
+  const location = useLocation()
 
   return (
     <>
@@ -34,17 +36,19 @@ function AuthenticatedApp({ session, userProfile, isAdmin }) {
       />
       <main className="min-h-[calc(100vh-56px)]">
         <Suspense fallback={<PageLoader />}>
-          <Routes>
-            <Route path="/" element={<Dashboard />} />
-            <Route path="/create" element={<CreateBug session={session} />} />
-            <Route path="/edit-profile" element={<EditProfile />} />
-            <Route
-              path="/bug/:id"
-              element={<BugDetail session={session} isAdmin={isAdmin} />}
-            />
-            <Route path="/logs" element={<Logs />} />
-            <Route path="*" element={<Navigate to="/" replace />} />
-          </Routes>
+          <AnimatePresence mode="wait">
+            <Routes location={location} key={location.pathname}>
+              <Route path="/" element={<Notice />} />
+              <Route path="/issue" element={<Issue session={session} />} />
+              <Route path="/edit-profile" element={<EditProfile />} />
+              <Route
+                path="/bug/:id"
+                element={<BugDetail session={session} isAdmin={isAdmin} />}
+              />
+              <Route path="/logs" element={<Logs />} />
+              <Route path="*" element={<Navigate to="/" replace />} />
+            </Routes>
+          </AnimatePresence>
         </Suspense>
       </main>
       <KeyboardShortcutsHelp />
@@ -83,9 +87,11 @@ function App() {
   return (
     <ErrorBoundary>
       <BrowserRouter basename={import.meta.env.BASE_URL}>
-        <ToastProvider>
-          <AppContent />
-        </ToastProvider>
+        <AuthProvider>
+          <ToastProvider>
+            <AppContent />
+          </ToastProvider>
+        </AuthProvider>
       </BrowserRouter>
     </ErrorBoundary>
   )

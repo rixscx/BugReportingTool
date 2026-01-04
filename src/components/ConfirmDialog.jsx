@@ -2,124 +2,46 @@ import { useState, useEffect, useRef } from 'react';
 /* eslint-disable react-refresh/only-export-components */
 import { useKeyboardShortcut } from '../hooks/useKeyboardShortcut';
 
-/**
- * A reusable confirmation dialog component
- * Inspired by shadcn/ui AlertDialog pattern
- */
-export function ConfirmDialog({
-  open,
-  onOpenChange,
-  title,
-  description,
-  confirmLabel = 'Confirm',
-  cancelLabel = 'Cancel',
-  confirmVariant = 'danger', // 'danger' | 'primary' | 'warning'
-  onConfirm,
-  loading = false,
-}) {
-  const dialogRef = useRef(null);
+export function ConfirmDialog({ open, onOpenChange, title, description, confirmLabel = 'Confirm', cancelLabel = 'Cancel', confirmVariant = 'danger', onConfirm, loading = false }) {
   const confirmButtonRef = useRef(null);
-  useKeyboardShortcut('Escape', () => {
-    if (open && !loading) {
-      onOpenChange(false);
-    }
-  }, { enabled: open });
+  
+  useKeyboardShortcut('Escape', () => { if (open && !loading) onOpenChange(false); }, { enabled: open });
+  
+  useEffect(() => { if (open && confirmButtonRef.current) confirmButtonRef.current.focus(); }, [open]);
+  
   useEffect(() => {
-    if (open && confirmButtonRef.current) {
-      confirmButtonRef.current.focus();
-    }
-  }, [open]);
-  useEffect(() => {
-    if (open) {
-      document.body.style.overflow = 'hidden';
-    } else {
-      document.body.style.overflow = '';
-    }
-    return () => {
-      document.body.style.overflow = '';
-    };
+    if (open) document.body.style.overflow = 'hidden';
+    else document.body.style.overflow = '';
+    return () => { document.body.style.overflow = ''; };
   }, [open]);
 
   if (!open) return null;
 
   const variantStyles = {
-    danger: 'bg-red-600 hover:bg-red-700 focus:ring-red-500',
-    primary: 'bg-blue-600 hover:bg-blue-700 focus:ring-blue-500',
-    warning: 'bg-yellow-600 hover:bg-yellow-700 focus:ring-yellow-500',
-  };
-
-  const handleBackdropClick = (e) => {
-    if (e.target === e.currentTarget && !loading) {
-      onOpenChange(false);
-    }
+    danger: 'bg-gradient-to-r from-[#ef4444] to-[#dc2626] hover:shadow-[0_8px_30px_rgba(239,68,68,0.3)]',
+    primary: 'bg-gradient-to-r from-[#6366f1] to-[#8b5cf6] hover:shadow-[0_8px_30px_rgba(99,102,241,0.3)]',
+    warning: 'bg-gradient-to-r from-[#eab308] to-[#ca8a04] hover:shadow-[0_8px_30px_rgba(234,179,8,0.3)]',
   };
 
   return (
-    <div
-      className="fixed inset-0 z-50 flex items-center justify-center"
-      onClick={handleBackdropClick}
-      role="dialog"
-      aria-modal="true"
-      aria-labelledby="dialog-title"
-      aria-describedby="dialog-description"
-    >
-      {/* Backdrop */}
-      <div className="fixed inset-0 bg-black/50 animate-fade-in" />
+    <div className="fixed inset-0 z-50 flex items-center justify-center" onClick={(e) => { if (e.target === e.currentTarget && !loading) onOpenChange(false); }} role="dialog" aria-modal="true">
+      <div className="fixed inset-0 bg-[#06060a]/80 backdrop-blur-xl" />
       
-      {/* Dialog */}
-      <div
-        ref={dialogRef}
-        className="relative z-50 w-full max-w-md bg-white rounded-lg shadow-xl p-6 mx-4 animate-slide-in"
-      >
-        <h2
-          id="dialog-title"
-          className="text-lg font-semibold text-gray-900 mb-2"
-        >
-          {title}
-        </h2>
+      {/* Ambient glow */}
+      <div className="fixed top-1/2 left-1/2 -translate-x-1/2 -translate-y-1/2 w-[400px] h-[400px] rounded-full bg-[rgba(239,68,68,0.05)] blur-[100px] pointer-events-none" />
+      
+      <div className="relative z-50 w-full max-w-sm bg-[rgba(12,12,18,0.95)] rounded-2xl border border-[rgba(255,255,255,0.08)] p-6 mx-4 backdrop-blur-2xl shadow-[0_24px_80px_rgba(0,0,0,0.5)]">
+        {/* Top gradient line */}
+        <div className="absolute top-0 left-6 right-6 h-px bg-gradient-to-r from-transparent via-[rgba(255,255,255,0.1)] to-transparent" />
         
-        <p
-          id="dialog-description"
-          className="text-sm text-gray-600 mb-6"
-        >
-          {description}
-        </p>
-        
+        <h2 className="text-[15px] font-semibold text-[#f0f0f5] mb-2">{title}</h2>
+        <p className="text-[13px] text-[#6b6b7b] mb-6 leading-relaxed">{description}</p>
         <div className="flex justify-end gap-3">
-          <button
-            type="button"
-            onClick={() => onOpenChange(false)}
-            disabled={loading}
-            className="px-4 py-2 text-sm font-medium text-gray-700 bg-white border border-gray-300 rounded-md hover:bg-gray-50 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-gray-500 disabled:opacity-50 disabled:cursor-not-allowed"
-          >
+          <button type="button" onClick={() => onOpenChange(false)} disabled={loading} className="px-4 py-2.5 text-[12px] font-medium text-[#9898a8] bg-[rgba(255,255,255,0.05)] border border-[rgba(255,255,255,0.08)] rounded-xl hover:bg-[rgba(255,255,255,0.08)] hover:text-[#f0f0f5] disabled:opacity-50 disabled:cursor-not-allowed transition-all duration-200">
             {cancelLabel}
           </button>
-          
-          <button
-            ref={confirmButtonRef}
-            type="button"
-            onClick={onConfirm}
-            disabled={loading}
-            className={`px-4 py-2 text-sm font-medium text-white rounded-md focus:outline-none focus:ring-2 focus:ring-offset-2 disabled:opacity-50 disabled:cursor-not-allowed flex items-center gap-2 ${variantStyles[confirmVariant]}`}
-          >
-            {loading && (
-              <svg className="animate-spin h-4 w-4" viewBox="0 0 24 24">
-                <circle
-                  className="opacity-25"
-                  cx="12"
-                  cy="12"
-                  r="10"
-                  stroke="currentColor"
-                  strokeWidth="4"
-                  fill="none"
-                />
-                <path
-                  className="opacity-75"
-                  fill="currentColor"
-                  d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"
-                />
-              </svg>
-            )}
+          <button ref={confirmButtonRef} type="button" onClick={onConfirm} disabled={loading} className={`px-4 py-2.5 text-[12px] font-medium text-white rounded-xl disabled:opacity-50 disabled:cursor-not-allowed transition-all duration-300 hover:-translate-y-0.5 flex items-center gap-2 ${variantStyles[confirmVariant]}`}>
+            {loading && <div className="w-3.5 h-3.5 border-2 border-white/30 border-t-white rounded-full animate-spin" />}
             {confirmLabel}
           </button>
         </div>
@@ -128,60 +50,17 @@ export function ConfirmDialog({
   );
 }
 
-/**
- * Hook for managing confirm dialog state
- */
 export function useConfirmDialog() {
-  const [state, setState] = useState({
-    open: false,
-    title: '',
-    description: '',
-    confirmLabel: 'Confirm',
-    cancelLabel: 'Cancel',
-    confirmVariant: 'danger',
-    onConfirm: () => {},
-    loading: false,
-  });
+  const [state, setState] = useState({ open: false, title: '', description: '', confirmLabel: 'Confirm', cancelLabel: 'Cancel', confirmVariant: 'danger', onConfirm: () => {}, loading: false });
 
-  const confirm = ({
-    title,
-    description,
-    confirmLabel = 'Confirm',
-    cancelLabel = 'Cancel',
-    confirmVariant = 'danger',
-  }) => {
+  const confirm = ({ title, description, confirmLabel = 'Confirm', cancelLabel = 'Cancel', confirmVariant = 'danger' }) => {
     return new Promise((resolve) => {
-      setState({
-        open: true,
-        title,
-        description,
-        confirmLabel,
-        cancelLabel,
-        confirmVariant,
-        onConfirm: () => {
-          resolve(true);
-          setState((s) => ({ ...s, open: false }));
-        },
-        loading: false,
-      });
+      setState({ open: true, title, description, confirmLabel, cancelLabel, confirmVariant, onConfirm: () => { resolve(true); setState((s) => ({ ...s, open: false })); }, loading: false });
     });
   };
 
-  const close = () => {
-    setState((s) => ({ ...s, open: false }));
-  };
+  const close = () => setState((s) => ({ ...s, open: false }));
+  const setLoading = (loading) => setState((s) => ({ ...s, loading }));
 
-  const setLoading = (loading) => {
-    setState((s) => ({ ...s, loading }));
-  };
-
-  return {
-    dialogProps: {
-      ...state,
-      onOpenChange: (open) => setState((s) => ({ ...s, open })),
-    },
-    confirm,
-    close,
-    setLoading,
-  };
+  return { dialogProps: { ...state, onOpenChange: (open) => setState((s) => ({ ...s, open })) }, confirm, close, setLoading };
 }

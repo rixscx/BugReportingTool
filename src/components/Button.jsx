@@ -1,42 +1,28 @@
-/**
- * Modern Button component with loading states and variants
- * Inspired by shadcn/ui and Mantine
- */
 /* eslint-disable react-refresh/only-export-components */
 import { forwardRef } from 'react'
-import { Spinner } from './Spinner'
 
 const buttonVariants = {
-  primary: 'bg-blue-600 hover:bg-blue-700 text-white shadow-sm',
-  secondary: 'bg-gray-100 hover:bg-gray-200 text-gray-900',
-  outline: 'border border-gray-300 hover:bg-gray-50 text-gray-700',
-  ghost: 'hover:bg-gray-100 text-gray-700',
-  danger: 'bg-red-600 hover:bg-red-700 text-white shadow-sm',
-  success: 'bg-green-600 hover:bg-green-700 text-white shadow-sm',
+  primary: 'bg-gradient-to-r from-[#6366f1] to-[#8b5cf6] hover:from-[#818cf8] hover:to-[#a78bfa] text-white shadow-[0_2px_8px_rgba(99,102,241,0.3),inset_0_1px_0_rgba(255,255,255,0.15)] hover:shadow-[0_8px_24px_rgba(99,102,241,0.4)]',
+  secondary: 'bg-gradient-to-b from-[#14141c] to-[#0f0f15] hover:from-[#1a1a24] hover:to-[#14141c] text-[#e4e4eb] border border-[rgba(255,255,255,0.08)] hover:border-[rgba(255,255,255,0.12)] shadow-[0_2px_4px_rgba(0,0,0,0.2),inset_0_1px_0_rgba(255,255,255,0.04)]',
+  outline: 'border border-[rgba(255,255,255,0.08)] hover:border-[rgba(255,255,255,0.15)] hover:bg-[rgba(255,255,255,0.04)] text-[#9898a8] hover:text-[#e4e4eb]',
+  ghost: 'hover:bg-[rgba(255,255,255,0.06)] text-[#9898a8] hover:text-[#e4e4eb]',
+  danger: 'bg-gradient-to-r from-[#dc2626] to-[#ef4444] hover:from-[#ef4444] hover:to-[#f87171] text-white shadow-[0_2px_8px_rgba(220,38,38,0.3)]',
+  success: 'bg-gradient-to-r from-[#059669] to-[#22c55e] hover:from-[#10b981] hover:to-[#4ade80] text-white shadow-[0_2px_8px_rgba(5,150,105,0.3)]',
 }
 
 const buttonSizes = {
-  xs: 'h-7 px-2 text-xs rounded',
-  sm: 'h-8 px-3 text-sm rounded-md',
-  md: 'h-10 px-4 text-sm rounded-md',
-  lg: 'h-11 px-6 text-base rounded-lg',
-  xl: 'h-12 px-8 text-lg rounded-lg',
-  icon: 'h-10 w-10 rounded-md',
-  'icon-sm': 'h-8 w-8 rounded-md',
-  'icon-lg': 'h-12 w-12 rounded-lg',
+  xs: 'h-7 px-3 text-[10px] gap-1.5 rounded-lg',
+  sm: 'h-8 px-3.5 text-[11px] gap-1.5 rounded-xl',
+  md: 'h-9 px-4 text-[12px] gap-2 rounded-xl',
+  lg: 'h-10 px-5 text-[13px] gap-2 rounded-2xl',
+  xl: 'h-12 px-6 text-[14px] gap-2.5 rounded-2xl',
+  icon: 'h-9 w-9 rounded-xl',
+  'icon-sm': 'h-7 w-7 rounded-lg',
+  'icon-lg': 'h-11 w-11 rounded-2xl',
 }
 
 export const Button = forwardRef(({ 
-  children,
-  variant = 'primary',
-  size = 'md',
-  loading = false,
-  loadingText,
-  disabled = false,
-  leftIcon,
-  rightIcon,
-  className = '',
-  ...props
+  children, variant = 'primary', size = 'md', loading = false, loadingText, disabled = false, leftIcon, rightIcon, className = '', ...props
 }, ref) => {
   const isDisabled = disabled || loading
   const isIconOnly = size.startsWith('icon')
@@ -46,31 +32,28 @@ export const Button = forwardRef(({
       ref={ref}
       disabled={isDisabled}
       className={`
-        inline-flex items-center justify-center gap-2
-        font-medium transition-all duration-200
-        focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-blue-500 focus-visible:ring-offset-2
-        disabled:opacity-50 disabled:cursor-not-allowed
-        btn-press
-        ${buttonVariants[variant]}
-        ${buttonSizes[size]}
+        inline-flex items-center justify-center font-medium 
+        transition-all duration-200 ease-out
+        focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[#6366f1] focus-visible:ring-offset-2 focus-visible:ring-offset-[#06060a]
+        disabled:opacity-40 disabled:cursor-not-allowed disabled:pointer-events-none
+        active:scale-[0.97] hover:-translate-y-0.5
+        ${buttonVariants[variant]} 
+        ${buttonSizes[size]} 
         ${className}
       `}
       {...props}
     >
       {loading ? (
         <>
-          <Spinner 
-            size={size === 'xs' || size === 'sm' || size === 'icon-sm' ? 'xs' : 'sm'} 
-            color={variant === 'primary' || variant === 'danger' || variant === 'success' ? 'white' : 'blue'}
-          />
-          {loadingText && !isIconOnly && <span>{loadingText}</span>}
+          <div className="w-4 h-4 border-2 border-current border-t-transparent rounded-full animate-spin" />
+          {loadingText && !isIconOnly && <span className="ml-1.5">{loadingText}</span>}
           {!loadingText && !isIconOnly && children}
         </>
       ) : (
         <>
-          {leftIcon && <span className="flex-shrink-0">{leftIcon}</span>}
+          {leftIcon && <span className="flex-shrink-0 opacity-80">{leftIcon}</span>}
           {children}
-          {rightIcon && <span className="flex-shrink-0">{rightIcon}</span>}
+          {rightIcon && <span className="flex-shrink-0 opacity-80">{rightIcon}</span>}
         </>
       )}
     </button>
@@ -79,28 +62,9 @@ export const Button = forwardRef(({
 
 Button.displayName = 'Button'
 
-/**
- * Icon button with loading state
- */
-export const IconButton = forwardRef(({ 
-  icon,
-  loading = false,
-  variant = 'ghost',
-  size = 'icon',
-  ariaLabel,
-  className = '',
-  ...props
-}, ref) => {
+export const IconButton = forwardRef(({ icon, loading = false, variant = 'ghost', size = 'icon', ariaLabel, className = '', ...props }, ref) => {
   return (
-    <Button
-      ref={ref}
-      variant={variant}
-      size={size}
-      loading={loading}
-      aria-label={ariaLabel}
-      className={className}
-      {...props}
-    >
+    <Button ref={ref} variant={variant} size={size} loading={loading} aria-label={ariaLabel} className={className} {...props}>
       {!loading && icon}
     </Button>
   )
@@ -108,66 +72,12 @@ export const IconButton = forwardRef(({
 
 IconButton.displayName = 'IconButton'
 
-/**
- * Button Group
- */
 export function ButtonGroup({ children, className = '' }) {
   return (
-    <div className={`inline-flex rounded-md shadow-sm ${className}`}>
+    <div className={`inline-flex [&>button]:rounded-none [&>button:first-child]:rounded-l-xl [&>button:last-child]:rounded-r-xl [&>button:not(:last-child)]:border-r-0 ${className}`}>
       {children}
     </div>
   )
-}
-
-/**
- * Common icons for buttons
- */
-export const ButtonIcons = {
-  Plus: () => (
-    <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 4v16m8-8H4" />
-    </svg>
-  ),
-  Check: () => (
-    <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M5 13l4 4L19 7" />
-    </svg>
-  ),
-  X: () => (
-    <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" />
-    </svg>
-  ),
-  Trash: () => (
-    <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16" />
-    </svg>
-  ),
-  Edit: () => (
-    <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M11 5H6a2 2 0 00-2 2v11a2 2 0 002 2h11a2 2 0 002-2v-5m-1.414-9.414a2 2 0 112.828 2.828L11.828 15H9v-2.828l8.586-8.586z" />
-    </svg>
-  ),
-  Save: () => (
-    <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M8 7H5a2 2 0 00-2 2v9a2 2 0 002 2h14a2 2 0 002-2V9a2 2 0 00-2-2h-3m-1 4l-3 3m0 0l-3-3m3 3V4" />
-    </svg>
-  ),
-  Refresh: () => (
-    <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M4 4v5h.582m15.356 2A8.001 8.001 0 004.582 9m0 0H9m11 11v-5h-.581m0 0a8.003 8.003 0 01-15.357-2m15.357 2H15" />
-    </svg>
-  ),
-  ArrowLeft: () => (
-    <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M10 19l-7-7m0 0l7-7m-7 7h18" />
-    </svg>
-  ),
-  ArrowRight: () => (
-    <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M14 5l7 7m0 0l-7 7m7-7H3" />
-    </svg>
-  ),
 }
 
 export default Button

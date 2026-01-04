@@ -1,77 +1,44 @@
 /* eslint-disable react-refresh/only-export-components */
 
-/**
- * Empty state component for when there's no data to display
- */
-export function EmptyState({
-  icon,
-  title,
-  description,
-  action,
-  className = '',
-}) {
-  return (
-    <div className={`flex flex-col items-center justify-center py-12 px-4 text-center ${className}`}>
-      {icon && (
-        <div className="w-16 h-16 mb-4 text-gray-300">
-          {icon}
-        </div>
-      )}
-      
-      {title && (
-        <h3 className="text-lg font-medium text-gray-900 mb-2">
-          {title}
-        </h3>
-      )}
-      
-      {description && (
-        <p className="text-sm text-gray-500 max-w-sm mb-6">
-          {description}
-        </p>
-      )}
-      
-      {action && (
-        <div>{action}</div>
-      )}
-    </div>
-  );
-}
-
-// Pre-defined empty state icons
-export const EmptyStateIcons = {
-  Search: () => (
-    <svg className="w-full h-full" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1.5} d="M21 21l-6-6m2-5a7 7 0 11-14 0 7 7 0 0114 0z" />
-    </svg>
-  ),
-  Bug: () => (
-    <svg className="w-full h-full" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1.5} d="M12 9v2m0 4h.01m-6.938 4h13.856c1.54 0 2.502-1.667 1.732-3L13.732 4c-.77-1.333-2.694-1.333-3.464 0L3.34 16c-.77 1.333.192 3 1.732 3z" />
-    </svg>
-  ),
-  Inbox: () => (
-    <svg className="w-full h-full" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1.5} d="M20 13V6a2 2 0 00-2-2H6a2 2 0 00-2 2v7m16 0v5a2 2 0 01-2 2H6a2 2 0 01-2-2v-5m16 0h-2.586a1 1 0 00-.707.293l-2.414 2.414a1 1 0 01-.707.293h-3.172a1 1 0 01-.707-.293l-2.414-2.414A1 1 0 006.586 13H4" />
-    </svg>
-  ),
-  Document: () => (
-    <svg className="w-full h-full" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1.5} d="M9 12h6m-6 4h6m2 5H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z" />
-    </svg>
-  ),
-  Users: () => (
-    <svg className="w-full h-full" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1.5} d="M12 4.354a4 4 0 110 5.292M15 21H3v-1a6 6 0 0112 0v1zm0 0h6v-1a6 6 0 00-9-5.197M13 7a4 4 0 11-8 0 4 4 0 018 0z" />
-    </svg>
-  ),
-  CheckCircle: () => (
-    <svg className="w-full h-full" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1.5} d="M9 12l2 2 4-4m6 2a9 9 0 11-18 0 9 9 0 0118 0z" />
-    </svg>
-  ),
-  Archive: () => (
-    <svg className="w-full h-full" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+const icons = {
+  Archive: (
+    <svg className="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24">
       <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1.5} d="M5 8h14M5 8a2 2 0 110-4h14a2 2 0 110 4M5 8v10a2 2 0 002 2h10a2 2 0 002-2V8m-9 4h4" />
     </svg>
   ),
-};
+  Search: (
+    <svg className="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1.5} d="M21 21l-6-6m2-5a7 7 0 11-14 0 7 7 0 0114 0z" />
+    </svg>
+  ),
+  Bug: (
+    <svg className="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1.5} d="M12 4v1m6 11h2m-6 0h-2v4m0-11v3m0 0h.01M12 12h4.01M16 20h4M4 12h4m12 0h.01M5 8h2a1 1 0 001-1V5a1 1 0 00-1-1H5a1 1 0 00-1 1v2a1 1 0 001 1zm12 0h2a1 1 0 001-1V5a1 1 0 00-1-1h-2a1 1 0 00-1 1v2a1 1 0 001 1zM5 20h2a1 1 0 001-1v-2a1 1 0 00-1-1H5a1 1 0 00-1 1v2a1 1 0 001 1z" />
+    </svg>
+  ),
+  Comment: (
+    <svg className="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1.5} d="M7 8h10M7 12h4m1 8l-4-4H5a2 2 0 01-2-2V6a2 2 0 012-2h14a2 2 0 012 2v8a2 2 0 01-2 2h-3l-4 4z" />
+    </svg>
+  ),
+}
+
+export function EmptyState({ icon, title, description, action, className = '' }) {
+  const IconComponent = icon && icons[icon]
+  
+  return (
+    <div className={`relative flex flex-col items-center justify-center py-20 px-4 text-center ${className}`}>
+      {/* Ambient glow */}
+      <div className="absolute top-1/2 left-1/2 -translate-x-1/2 -translate-y-1/2 w-[300px] h-[300px] rounded-full bg-[rgba(99,102,241,0.04)] blur-[80px] pointer-events-none" />
+      
+      {IconComponent && (
+        <div className="relative w-16 h-16 rounded-2xl bg-gradient-to-br from-[rgba(99,102,241,0.15)] to-[rgba(139,92,246,0.1)] border border-[rgba(255,255,255,0.08)] flex items-center justify-center mb-6 text-[#6366f1] shadow-[0_8px_32px_rgba(99,102,241,0.1)]">
+          {IconComponent}
+        </div>
+      )}
+      {title && <h3 className="relative text-[15px] font-medium text-[#f0f0f5] mb-2">{title}</h3>}
+      {description && <p className="relative text-[13px] text-[#6b6b7b] max-w-sm mb-6 leading-relaxed">{description}</p>}
+      {action && <div className="relative">{action}</div>}
+    </div>
+  )
+}

@@ -1,65 +1,34 @@
-import React, { useMemo } from 'react'
+import { useMemo } from 'react'
 import { Link } from 'react-router-dom'
 
-// Helper: color for action
-function getActionColor(action) {
-    if (action.includes('deleted')) return 'bg-red-500/20 text-red-400 border-red-500/30'
-    if (action.includes('comment')) return 'bg-green-500/20 text-green-400 border-green-500/30'
-    if (action.includes('status')) return 'bg-blue-500/20 text-blue-400 border-blue-500/30'
-    if (action.includes('created')) return 'bg-indigo-500/20 text-indigo-400 border-indigo-500/30'
-    if (action.includes('archive')) return 'bg-amber-500/20 text-amber-400 border-amber-500/30'
-    return 'bg-slate-500/20 text-slate-400 border-slate-500/30'
-}
-
 export default function ActivityGraph({ activities }) {
-    // Group activities by user, keep last 5 per user
     const userActivities = useMemo(() => {
         if (!activities || activities.length === 0) return []
-
         const userMap = new Map()
 
         activities.forEach(act => {
             const userId = act.user_id || act.actor_id
             if (!userId) return
-
-            const userName = act.user?.username || act.actor_email || userId.slice(0, 12)
-            const userAvatar = userName?.[0]?.toUpperCase() || '?'
+            const userName = act.user?.username || act.actor_email || userId.slice(0, 8)
 
             if (!userMap.has(userId)) {
-                userMap.set(userId, {
-                    id: userId,
-                    name: userName,
-                    avatar: userAvatar,
-                    activities: []
-                })
+                userMap.set(userId, { id: userId, name: userName, activities: [] })
             }
-
             userMap.get(userId).activities.push({
-                id: act.id,
-                action: act.action,
-                bugId: act.bug_id,
-                timestamp: act.created_at,
-                metadata: act.metadata
+                id: act.id, action: act.action, bugId: act.bug_id, timestamp: act.created_at
             })
         })
 
-        // Limit to last 5 activities per user and sort users by most recent activity
         return Array.from(userMap.values())
-            .map(user => ({
-                ...user,
-                activities: user.activities.slice(0, 5) // Already sorted by created_at desc from useActivity
-            }))
-            .sort((a, b) => {
-                const aTime = a.activities[0]?.timestamp || ''
-                const bTime = b.activities[0]?.timestamp || ''
-                return bTime.localeCompare(aTime)
-            })
+            .map(user => ({ ...user, activities: user.activities.slice(0, 5) }))
+            .sort((a, b) => (b.activities[0]?.timestamp || '').localeCompare(a.activities[0]?.timestamp || ''))
     }, [activities])
 
     if (!activities || activities.length === 0) {
         return (
-            <div className="bg-white rounded-xl border border-slate-200 p-12 text-center text-slate-500">
-                No activity logs to visualize. Perform some actions first!
+            <div className="relative bg-[rgba(12,12,18,0.7)] backdrop-blur-xl rounded-2xl border border-[rgba(255,255,255,0.06)] p-12 text-center overflow-hidden">
+                <div className="absolute inset-0 bg-gradient-to-br from-[rgba(99,102,241,0.03)] to-transparent pointer-events-none" />
+                <div className="relative text-[13px] text-[#4a4a58]">No activity to visualize</div>
             </div>
         )
     }
@@ -67,55 +36,30 @@ export default function ActivityGraph({ activities }) {
     return (
         <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
             {userActivities.map(user => (
-                <div
-                    key={user.id}
-                    className="bg-white rounded-xl border border-slate-200 shadow-sm overflow-hidden"
-                >
-                    {/* User Header */}
-                    <div className="bg-slate-50 border-b border-slate-200 px-4 py-3 flex items-center gap-3">
-                        <div className="w-10 h-10 rounded-full bg-gradient-to-br from-indigo-500 to-purple-600 flex items-center justify-center text-sm font-bold text-white">
-                            {user.avatar}
+                <div key={user.id} className="group relative bg-[rgba(12,12,18,0.7)] backdrop-blur-xl rounded-2xl border border-[rgba(255,255,255,0.06)] overflow-hidden hover:border-[rgba(99,102,241,0.3)] transition-all duration-300 hover:-translate-y-0.5">
+                    {/* Top gradient accent */}
+                    <div className="absolute top-0 left-0 right-0 h-px bg-gradient-to-r from-transparent via-[#6366f1]/30 to-transparent opacity-0 group-hover:opacity-100 transition-opacity" />
+                    
+                    <div className="border-b border-[rgba(255,255,255,0.06)] px-4 py-3 flex items-center gap-3">
+                        <div className="w-8 h-8 rounded-xl bg-gradient-to-br from-[rgba(99,102,241,0.2)] to-[rgba(139,92,246,0.2)] border border-[rgba(255,255,255,0.08)] flex items-center justify-center text-[11px] text-[#818cf8] font-semibold shadow-[0_4px_12px_rgba(99,102,241,0.1)]">
+                            {user.name[0]?.toUpperCase() || '?'}
                         </div>
                         <div className="min-w-0 flex-1">
-                            <div className="font-medium text-slate-900 truncate">{user.name}</div>
-                            <div className="text-xs text-slate-500">Last {user.activities.length} activities</div>
+                            <div className="text-[12px] font-medium text-[#f0f0f5] truncate">{user.name}</div>
+                            <div className="text-[10px] text-[#4a4a58]">{user.activities.length} actions</div>
                         </div>
                     </div>
-
-                    {/* Activity List */}
-                    <div className="divide-y divide-slate-100">
-                        {user.activities.map((act, i) => (
-                            <div key={act.id} className="px-4 py-3 hover:bg-slate-50 transition-colors">
-                                <div className="flex items-start gap-3">
-                                    {/* Timeline dot */}
-                                    <div className="relative pt-1.5">
-                                        <div className={`w-2 h-2 rounded-full ${act.action.includes('deleted') ? 'bg-red-500' :
-                                                act.action.includes('comment') ? 'bg-green-500' :
-                                                    act.action.includes('status') ? 'bg-blue-500' :
-                                                        'bg-slate-400'
-                                            }`}></div>
-                                        {i < user.activities.length - 1 && (
-                                            <div className="absolute left-1/2 top-3 w-px h-[calc(100%+0.75rem)] bg-slate-200 -translate-x-1/2"></div>
-                                        )}
-                                    </div>
-
-                                    {/* Activity Content */}
-                                    <div className="flex-1 min-w-0">
-                                        <div className="flex items-center gap-2 flex-wrap">
-                                            <span className={`text-xs px-2 py-0.5 rounded border ${getActionColor(act.action)}`}>
-                                                {act.action}
-                                            </span>
-                                            <Link
-                                                to={`/bug/${act.bugId}`}
-                                                className="text-xs text-blue-600 hover:underline truncate max-w-[120px]"
-                                            >
-                                                #{act.bugId?.slice(0, 8)}
-                                            </Link>
-                                        </div>
-                                        <div className="text-[10px] text-slate-400 mt-1">
-                                            {new Date(act.timestamp).toLocaleString()}
-                                        </div>
-                                    </div>
+                    <div className="divide-y divide-[rgba(255,255,255,0.04)]">
+                        {user.activities.map((act) => (
+                            <div key={act.id} className="px-4 py-2.5 hover:bg-[rgba(99,102,241,0.05)] transition-all duration-200">
+                                <div className="flex items-center justify-between gap-2">
+                                    <span className="text-[11px] text-[#9898a8]">{act.action.replace(/_/g, ' ')}</span>
+                                    <Link to={`/bug/${act.bugId}`} className="text-[10px] font-mono text-[#4a4a58] hover:text-[#818cf8] transition-colors">
+                                        #{act.bugId?.slice(0, 5)}
+                                    </Link>
+                                </div>
+                                <div className="text-[10px] text-[#4a4a58] mt-0.5">
+                                    {new Date(act.timestamp).toLocaleDateString()}
                                 </div>
                             </div>
                         ))}

@@ -4,9 +4,6 @@ import { useState, useEffect, useCallback, createContext, useContext } from 'rea
 
 const ToastContext = createContext(null)
 
-/**
- * Toast notification types
- */
 export const TOAST_TYPES = {
   SUCCESS: 'success',
   ERROR: 'error',
@@ -14,61 +11,81 @@ export const TOAST_TYPES = {
   INFO: 'info',
 }
 
-/**
- * Individual Toast component
- */
+const toastConfig = {
+  success: {
+    bg: 'bg-gradient-to-r from-[#0a0a0f]/95 to-[#0f0f15]/95',
+    border: 'border-[#22c55e]/25',
+    dot: 'bg-[#22c55e]',
+    dotGlow: 'shadow-[0_0_12px_rgba(34,197,94,0.6)]',
+    text: 'text-[#f0f0f5]',
+    glow: 'shadow-[0_8px_32px_rgba(34,197,94,0.15)]',
+  },
+  error: {
+    bg: 'bg-gradient-to-r from-[#0a0a0f]/95 to-[#0f0f15]/95',
+    border: 'border-[#ef4444]/25',
+    dot: 'bg-[#ef4444]',
+    dotGlow: 'shadow-[0_0_12px_rgba(239,68,68,0.6)]',
+    text: 'text-[#f0f0f5]',
+    glow: 'shadow-[0_8px_32px_rgba(239,68,68,0.15)]',
+  },
+  warning: {
+    bg: 'bg-gradient-to-r from-[#0a0a0f]/95 to-[#0f0f15]/95',
+    border: 'border-[#f59e0b]/25',
+    dot: 'bg-[#f59e0b]',
+    dotGlow: 'shadow-[0_0_12px_rgba(245,158,11,0.6)]',
+    text: 'text-[#f0f0f5]',
+    glow: 'shadow-[0_8px_32px_rgba(245,158,11,0.15)]',
+  },
+  info: {
+    bg: 'bg-gradient-to-r from-[#0a0a0f]/95 to-[#0f0f15]/95',
+    border: 'border-[#6366f1]/25',
+    dot: 'bg-[#6366f1]',
+    dotGlow: 'shadow-[0_0_12px_rgba(99,102,241,0.6)]',
+    text: 'text-[#f0f0f5]',
+    glow: 'shadow-[0_8px_32px_rgba(99,102,241,0.15)]',
+  },
+}
+
 function Toast({ id, message, type, onRemove }) {
+  const [isExiting, setIsExiting] = useState(false)
+  const config = toastConfig[type] || toastConfig.info
+
   useEffect(() => {
     const timer = setTimeout(() => {
-      onRemove(id)
-    }, 5000)
-
+      setIsExiting(true)
+      setTimeout(() => onRemove(id), 150)
+    }, 3500)
     return () => clearTimeout(timer)
   }, [id, onRemove])
 
-  const typeStyles = {
-    success: 'bg-green-500 text-white',
-    error: 'bg-red-500 text-white',
-    warning: 'bg-yellow-500 text-white',
-    info: 'bg-blue-500 text-white',
-  }
-
-  const icons = {
-    success: (
-      <svg className="w-5 h-5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M5 13l4 4L19 7" />
-      </svg>
-    ),
-    error: (
-      <svg className="w-5 h-5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" />
-      </svg>
-    ),
-    warning: (
-      <svg className="w-5 h-5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 9v2m0 4h.01m-6.938 4h13.856c1.54 0 2.502-1.667 1.732-3L13.732 4c-.77-1.333-2.694-1.333-3.464 0L3.34 16c-.77 1.333.192 3 1.732 3z" />
-      </svg>
-    ),
-    info: (
-      <svg className="w-5 h-5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M13 16h-1v-4h-1m1-4h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z" />
-      </svg>
-    ),
+  const handleRemove = () => {
+    setIsExiting(true)
+    setTimeout(() => onRemove(id), 150)
   }
 
   return (
     <div
-      className={`flex items-center gap-3 px-4 py-3 rounded-lg shadow-lg ${typeStyles[type]} animate-slide-in`}
+      className={`
+        relative flex items-center gap-3.5 px-4 py-3 
+        ${config.bg} border ${config.border} rounded-2xl 
+        ${config.glow}
+        backdrop-blur-2xl
+        transition-all duration-200 ease-out
+        ${isExiting ? 'opacity-0 translate-x-8 scale-95' : 'opacity-100 translate-x-0 scale-100'}
+        toast-enter
+      `}
       role="alert"
     >
-      {icons[type]}
-      <span className="flex-1 text-sm font-medium">{message}</span>
-      <button
-        onClick={() => onRemove(id)}
-        className="p-1 hover:opacity-80 transition-opacity"
-        aria-label="Close notification"
+      {/* Top gradient line */}
+      <div className="absolute top-0 left-4 right-4 h-px bg-gradient-to-r from-transparent via-[rgba(255,255,255,0.1)] to-transparent" />
+      
+      <span className={`w-2 h-2 rounded-full ${config.dot} ${config.dotGlow} flex-shrink-0`} />
+      <span className={`flex-1 text-[13px] font-medium ${config.text}`}>{message}</span>
+      <button 
+        onClick={handleRemove} 
+        className="p-1.5 hover:bg-[rgba(255,255,255,0.08)] rounded-lg transition-all duration-150 text-[#4a4a58] hover:text-[#9898a8]"
       >
-        <svg className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+        <svg className="w-3.5 h-3.5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
           <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" />
         </svg>
       </button>
@@ -76,28 +93,16 @@ function Toast({ id, message, type, onRemove }) {
   )
 }
 
-/**
- * Toast container component
- */
 function ToastContainer({ toasts, removeToast }) {
   return (
-    <div className="fixed bottom-4 right-4 z-50 flex flex-col gap-2 max-w-sm">
+    <div className="fixed bottom-5 right-5 z-50 flex flex-col gap-2.5 max-w-sm">
       {toasts.map((toast) => (
-        <Toast
-          key={toast.id}
-          id={toast.id}
-          message={toast.message}
-          type={toast.type}
-          onRemove={removeToast}
-        />
+        <Toast key={toast.id} id={toast.id} message={toast.message} type={toast.type} onRemove={removeToast} />
       ))}
     </div>
   )
 }
 
-/**
- * Toast provider component
- */
 export function ToastProvider({ children }) {
   const [toasts, setToasts] = useState([])
 
@@ -127,26 +132,16 @@ export function ToastProvider({ children }) {
   )
 }
 
-/**
- * Custom hook to use toast notifications
- */
 export function useToast() {
   const context = useContext(ToastContext)
-  if (!context) {
-    throw new Error('useToast must be used within a ToastProvider')
-  }
+  if (!context) throw new Error('useToast must be used within a ToastProvider')
   
-  // Provide both the toast object and a showToast function
   const showToast = (message, type = 'info') => {
     switch (type) {
-      case 'success':
-        return context.success(message)
-      case 'error':
-        return context.error(message)
-      case 'warning':
-        return context.warning(message)
-      default:
-        return context.info(message)
+      case 'success': return context.success(message)
+      case 'error': return context.error(message)
+      case 'warning': return context.warning(message)
+      default: return context.info(message)
     }
   }
   
