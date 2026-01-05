@@ -1,7 +1,31 @@
 import { useState, useEffect, useCallback } from 'react'
 import { supabase } from '../lib/supabaseClient'
 
-export default function CommentSection({ bugId, session, bugReporterId, bugReporterName, bugReporterEmail }) {
+// Helper to render @mentions with highlighting
+const renderWithMentions = (text) => {
+  if (!text) return text
+  const mentionRegex = /@(\w+)/g
+  const parts = []
+  let lastIndex = 0
+  let match
+  while ((match = mentionRegex.exec(text)) !== null) {
+    if (match.index > lastIndex) {
+      parts.push(text.slice(lastIndex, match.index))
+    }
+    parts.push(
+      <span key={match.index} className="text-[#818cf8] font-medium bg-[rgba(99,102,241,0.15)] px-1 rounded">
+        {match[0]}
+      </span>
+    )
+    lastIndex = match.index + match[0].length
+  }
+  if (lastIndex < text.length) {
+    parts.push(text.slice(lastIndex))
+  }
+  return parts.length > 0 ? parts : text
+}
+
+export default function CommentSection({ bugId, session, isAdmin }) {
   const [comments, setComments] = useState([])
   const [newComment, setNewComment] = useState('')
   const [loading, setLoading] = useState(true)
@@ -13,63 +37,35 @@ export default function CommentSection({ bugId, session, bugReporterId, bugRepor
 
   const fetchComments = useCallback(async () => {
     try {
+      // Fetch comments using author_id (new schema)
       const { data, error: fetchError } = await supabase
         .from('comments')
-        .select(`*`)
+        .select('*')
         .eq('bug_id', bugId)
         .order('created_at', { ascending: true })
 
       if (fetchError) throw fetchError
       const commentsData = data || []
 
-      const userIds = Array.from(new Set(commentsData.map(c => c.user_id).filter(Boolean)))
+      // Fetch profiles for all authors
+      const authorIds = Array.from(new Set(commentsData.map(c => c.author_id).filter(Boolean)))
       let profilesMap = {}
-      const tasks = []
 
-      if (userIds.length > 0) {
-        tasks.push(supabase
+      if (authorIds.length > 0) {
+        const { data: profiles } = await supabase
           .from('profiles')
-          .select('id, username, email, full_name')
-          .in('id', userIds)
-          .then(({ data }) => ({ type: 'profiles', data }))
-        )
+          .select('id, username, email')
+          .in('id', authorIds)
+        profilesMap = (profiles || []).reduce((acc, p) => {
+          acc[p.id] = p
+          return acc
+        }, {})
       }
 
-      tasks.push(supabase
-        .from('bug_activity')
-        .select('user_id, actor_email, actor_id')
-        .eq('bug_id', bugId)
-        .eq('action', 'comment_created')
-        .then(({ data }) => ({ type: 'activity', data }))
-      )
-
-      const results = await Promise.all(tasks)
-      const profilesData = results.find(r => r.type === 'profiles')?.data || []
-      const activityData = results.find(r => r.type === 'activity')?.data || []
-
-      profilesMap = profilesData.reduce((acc, p) => {
-        acc[p.id] = p
-        return acc
-      }, {})
-
-      const activityMap = activityData.reduce((acc, a) => {
-        const uid = a.user_id || a.actor_id
-        if (uid && a.actor_email) {
-          acc[uid] = { email: a.actor_email, username: a.actor_email.split('@')[0] }
-        }
-        return acc
-      }, {})
-
-      const enriched = commentsData.map(c => {
-        let user = profilesMap[c.user_id]
-        if (!user && c.user_id === bugReporterId && bugReporterName) {
-          user = { id: c.user_id, username: bugReporterName, email: bugReporterEmail, full_name: bugReporterName }
-        }
-        if (!user && activityMap[c.user_id]) {
-          user = { id: c.user_id, username: activityMap[c.user_id].username, email: activityMap[c.user_id].email }
-        }
-        return { ...c, user }
-      })
+      const enriched = commentsData.map(c => ({
+        ...c,
+        author: profilesMap[c.author_id] || { email: 'Unknown', username: 'Unknown' }
+      }))
 
       setComments(enriched)
     } catch {
@@ -97,22 +93,21 @@ export default function CommentSection({ bugId, session, bugReporterId, bugRepor
     setError(null)
 
     try {
+      // Insert comment with author_id (new schema)
       const { data: inserted, error: insertError } = await supabase
         .from('comments')
-        .insert({ bug_id: bugId, user_id: session.user.id, content: newComment.trim() })
-        .select(`*`)
+        .insert({ bug_id: bugId, author_id: session.user.id, content: newComment.trim() })
+        .select('*')
         .single()
 
       if (insertError) throw insertError
 
       if (inserted) {
-        const { data: [profile] = [] } = await supabase.from('profiles').select('id, username, email, full_name').eq('id', session.user.id)
-        const enriched = { ...inserted, user: profile || null }
+        const { data: [profile] = [] } = await supabase.from('profiles').select('id, username, email').eq('id', session.user.id)
+        const enriched = { ...inserted, author: profile || null }
         setComments((prev) => [...prev, enriched])
         setNewComment('')
-        await supabase.from('bug_activity').insert({
-          bug_id: bugId, user_id: session.user.id, actor_id: session.user.id, actor_email: session.user.email, action: 'comment_created', metadata: { comment_id: inserted.id }
-        })
+        // DB trigger handles activity_logs
       }
     } catch (err) {
       setError('Failed to post comment: ' + err.message)
@@ -122,7 +117,9 @@ export default function CommentSection({ bugId, session, bugReporterId, bugRepor
   }
 
   const handleDelete = async (comment) => {
-    if (comment.user_id !== session.user.id) return
+    // Permission: author or admin can delete
+    const canDelete = comment.author_id === session.user.id || isAdmin
+    if (!canDelete) return
     if (!window.confirm('Delete this comment?')) return
     setCommentActionId(comment.id)
     setError(null)
@@ -130,9 +127,7 @@ export default function CommentSection({ bugId, session, bugReporterId, bugRepor
       const { error: deleteError } = await supabase.from('comments').delete().eq('id', comment.id)
       if (deleteError) throw deleteError
       setComments((prev) => prev.filter((c) => c.id !== comment.id))
-      await supabase.from('bug_activity').insert({
-        bug_id: bugId, user_id: session.user.id, actor_id: session.user.id, actor_email: session.user.email, action: 'comment_deleted', metadata: { comment_id: comment.id }
-      })
+      // DB trigger handles activity_logs
     } catch (err) {
       setError('Failed to delete comment: ' + err.message)
     } finally {
@@ -145,6 +140,8 @@ export default function CommentSection({ bugId, session, bugReporterId, bugRepor
 
   const handleUpdate = async (comment) => {
     if (!editText.trim()) return
+    // Only author can edit
+    if (comment.author_id !== session.user.id) return
     setCommentActionId(comment.id)
     setError(null)
     try {
@@ -153,9 +150,7 @@ export default function CommentSection({ bugId, session, bugReporterId, bugRepor
       setComments((prev) => prev.map((c) => (c.id === comment.id ? { ...c, content: editText.trim() } : c)))
       setEditingCommentId(null)
       setEditText('')
-      await supabase.from('bug_activity').insert({
-        bug_id: bugId, user_id: session.user.id, actor_id: session.user.id, actor_email: session.user.email, action: 'comment_updated', metadata: { comment_id: comment.id }
-      })
+      // DB trigger handles activity_logs
     } catch (err) {
       setError('Failed to update comment: ' + err.message)
     } finally {
@@ -177,7 +172,7 @@ export default function CommentSection({ bugId, session, bugReporterId, bugRepor
   return (
     <div className="relative bg-[rgba(12,12,18,0.7)] rounded-2xl border border-[rgba(255,255,255,0.06)] p-6 backdrop-blur-xl">
       <div className="absolute top-0 left-6 right-6 h-px bg-gradient-to-r from-transparent via-[rgba(255,255,255,0.08)] to-transparent" />
-      
+
       <div className="flex items-center justify-between mb-5">
         <span className="text-sm font-medium text-[#f0f0f5]">Comments</span>
         {comments.length > 0 && (
@@ -202,19 +197,21 @@ export default function CommentSection({ bugId, session, bugReporterId, bugRepor
           {comments.map((comment) => (
             <div key={comment.id} className="flex gap-3">
               <div className="w-8 h-8 rounded-xl bg-gradient-to-br from-[rgba(99,102,241,0.15)] to-[rgba(139,92,246,0.15)] border border-[rgba(255,255,255,0.06)] flex items-center justify-center text-[10px] text-[#818cf8] font-medium flex-shrink-0">
-                {(comment.user?.username || comment.user?.email || 'U')[0].toUpperCase()}
+                {(comment.author?.username || comment.author?.email || 'U')[0].toUpperCase()}
               </div>
               <div className="flex-1 min-w-0">
                 <div className="flex items-center gap-2.5 mb-1">
                   <span className="text-[12px] font-medium text-[#f0f0f5]">
-                    {comment.user?.username || comment.user?.email?.split('@')[0] || 'Unknown'}
+                    {comment.author?.username || comment.author?.email?.split('@')[0] || 'Unknown'}
                   </span>
                   <span className="text-[10px] text-[#4a4a58]">{formatTime(comment.created_at)}</span>
-                  {comment.user_id === session?.user?.id && (
+                  {(comment.author_id === session?.user?.id || isAdmin) && (
                     <div className="ml-auto flex items-center gap-3">
-                      <button onClick={() => startEditing(comment)} disabled={commentActionId === comment.id} className="text-[10px] text-[#4a4a58] hover:text-[#9898a8] disabled:opacity-50 transition-colors">
-                        edit
-                      </button>
+                      {comment.author_id === session?.user?.id && (
+                        <button onClick={() => startEditing(comment)} disabled={commentActionId === comment.id} className="text-[10px] text-[#4a4a58] hover:text-[#9898a8] disabled:opacity-50 transition-colors">
+                          edit
+                        </button>
+                      )}
                       <button onClick={() => handleDelete(comment)} disabled={commentActionId === comment.id} className="text-[10px] text-[#4a4a58] hover:text-[#f87171] disabled:opacity-50 transition-colors">
                         delete
                       </button>
@@ -240,7 +237,7 @@ export default function CommentSection({ bugId, session, bugReporterId, bugRepor
                     </div>
                   </div>
                 ) : (
-                  <p className="text-[12px] text-[#9898a8] whitespace-pre-wrap leading-relaxed">{comment.content}</p>
+                  <p className="text-[12px] text-[#9898a8] whitespace-pre-wrap leading-relaxed">{renderWithMentions(comment.content)}</p>
                 )}
               </div>
             </div>

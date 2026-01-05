@@ -1,7 +1,7 @@
 import { useState, useEffect, useCallback, useRef } from 'react'
 import { supabase } from '../lib/supabaseClient'
 import { deleteBugImages, getBugPreviewImage } from '../lib/bugImageStorage'
-import { logBugActivity } from '../lib/activityLogger'
+// NOTE: Client-side activity logging removed - DB triggers handle all activity_logs
 
 /**
  * Custom hook for fetching and managing bugs
@@ -36,7 +36,8 @@ export function useBugs(options = {}) {
       if (fetchError) throw fetchError
 
       const bugsWithImages = await Promise.all((data || []).map(async (bug) => {
-        const preview = await getBugPreviewImage(bug.user_id, bug.id)
+        // Use reported_by for ownership per new schema
+        const preview = await getBugPreviewImage(bug.reported_by, bug.id)
         // Extract synthetic steps_to_reproduce from description if present
         let steps = null
         if (bug.description && bug.description.includes('\n\n---\n\n**Steps to Reproduce:**\n\n')) {
@@ -83,7 +84,8 @@ export function useBug(bugId) {
         .single()
 
       if (fetchError) throw fetchError
-      const preview = await getBugPreviewImage(data.user_id, data.id)
+      // Use reported_by for ownership per new schema
+      const preview = await getBugPreviewImage(data.reported_by, data.id)
       let steps = null
       if (data.description && data.description.includes('\n\n---\n\n**Steps to Reproduce:**\n\n')) {
         const parts = data.description.split('\n\n---\n\n**Steps to Reproduce:**\n\n')
@@ -115,7 +117,7 @@ export function useBugMutations() {
   const [loading, setLoading] = useState(false)
   const [error, setError] = useState(null)
 
-  const updateStatus = useCallback(async (bugId, newStatus, userId, userEmail, oldStatus) => {
+  const updateStatus = useCallback(async (bugId, newStatus) => {
     setLoading(true)
     setError(null)
 
@@ -126,17 +128,7 @@ export function useBugMutations() {
         .eq('id', bugId)
 
       if (updateError) throw updateError
-
-      // Log with centralized helper - entity_id is bugId
-      await logBugActivity({
-        action: 'status_changed',
-        bugId: bugId,
-        actorId: userId,
-        actorEmail: userEmail,
-        field: 'status',
-        oldValue: oldStatus,
-        newValue: newStatus,
-      })
+      // DB trigger handles activity_logs
 
       return { success: true }
     } catch (err) {
@@ -147,36 +139,37 @@ export function useBugMutations() {
     }
   }, [])
 
-  // SCHEMA COMPLIANCE: assigned_to field does not exist in authoritative schema
-  // Only user_id (owner) exists. Assignment feature disabled.
+  // Update assigned_to (new schema supports assigned_to field)
   const updateAssignee = useCallback(async (bugId, assigneeId) => {
-    console.warn('Assignment feature disabled: schema only supports user_id (owner)')
-    return { success: false, error: 'Assignment not supported in current schema' }
+    setLoading(true)
+    setError(null)
+    try {
+      const { error: updateError } = await supabase
+        .from('bugs')
+        .update({ assigned_to: assigneeId })
+        .eq('id', bugId)
+      if (updateError) throw updateError
+      return { success: true }
+    } catch (err) {
+      setError(err.message)
+      return { success: false, error: err.message }
+    } finally {
+      setLoading(false)
+    }
   }, [])
 
-  const archiveBug = useCallback(async (bugId, userId, userEmail) => {
+  const archiveBug = useCallback(async (bugId) => {
     setLoading(true)
     setError(null)
 
     try {
-      // 1. Update the bug first
       const { error: archiveError } = await supabase
         .from('bugs')
         .update({ is_archived: true })
         .eq('id', bugId)
 
       if (archiveError) throw archiveError
-
-      // 2. Log activity with entity_id (bugId is the entity)
-      await logBugActivity({
-        action: 'bug_archived',
-        bugId: bugId,
-        actorId: userId,
-        actorEmail: userEmail,
-        field: 'is_archived',
-        oldValue: 'false',
-        newValue: 'true',
-      })
+      // DB trigger handles activity_logs
 
       return { success: true }
     } catch (err) {
@@ -187,29 +180,18 @@ export function useBugMutations() {
     }
   }, [])
 
-  const unarchiveBug = useCallback(async (bugId, userId, userEmail) => {
+  const unarchiveBug = useCallback(async (bugId) => {
     setLoading(true)
     setError(null)
 
     try {
-      // 1. Update the bug first
       const { error: unarchiveError } = await supabase
         .from('bugs')
         .update({ is_archived: false })
         .eq('id', bugId)
 
       if (unarchiveError) throw unarchiveError
-
-      // 2. Log activity with entity_id (bugId is the entity)
-      await logBugActivity({
-        action: 'bug_restored',
-        bugId: bugId,
-        actorId: userId,
-        actorEmail: userEmail,
-        field: 'is_archived',
-        oldValue: 'true',
-        newValue: 'false',
-      })
+      // DB trigger handles activity_logs
 
       return { success: true }
     } catch (err) {
@@ -221,42 +203,31 @@ export function useBugMutations() {
   }, [])
 
   /**
-   * PROFESSIONAL DELETE FLOW (IDEMPOTENT)
-   * Delete permission: Admin OR bug owner (reporter)
-   * 
-   * Steps (FAIL-FAST - abort if any step fails):
-   * 1. Snapshot → Insert full bug data into `deleted_bugs`
-   * 2. Log → Insert ONE `bug_deleted` into `bug_activity`
-   * 3. Delete → Hard delete from `bugs`
-   * 4. Cleanup → Delete images from storage (best-effort)
-   * 
-   * IDEMPOTENCY: A bug can only be deleted ONCE. Subsequent calls are rejected.
+   * DELETE FLOW (SIMPLIFIED)
+   * Delete permission: Admin OR bug owner (reported_by)
+   * DB triggers handle activity_logs
    */
 
   // Track bugs currently being deleted to prevent duplicate attempts
   const deletingBugIdsRef = useRef(new Set())
 
-  const deleteBug = useCallback(async (bug, actorId, actorEmail, isAdmin = false) => {
-    // ═══════════════════════════════════════════════════════════════
-    // IDEMPOTENCY CHECK - Prevent duplicate delete attempts
-    // ═══════════════════════════════════════════════════════════════
+  const deleteBug = useCallback(async (bug, actorId, isAdmin = false) => {
     if (!bug || !bug.id) {
       setError('Invalid bug data')
       return { success: false, error: 'Invalid bug data' }
     }
 
     if (deletingBugIdsRef.current.has(bug.id)) {
-      console.warn('🔒 IDEMPOTENCY: Delete already in progress for bug:', bug.id)
+      console.warn('Delete already in progress for bug:', bug.id)
       return { success: false, error: 'Delete already in progress' }
     }
 
-    // Mark this bug as being deleted
     deletingBugIdsRef.current.add(bug.id)
     setLoading(true)
     setError(null)
 
-    // Permission check: Admin OR owner
-    const isOwner = bug.user_id === actorId
+    // Permission check: Admin OR owner (using reported_by field)
+    const isOwner = bug.reported_by === actorId
     if (!isAdmin && !isOwner) {
       setError('Permission denied: Only admin or bug reporter can delete')
       deletingBugIdsRef.current.delete(bug.id)
@@ -265,89 +236,27 @@ export function useBugMutations() {
     }
 
     try {
-      // ═══════════════════════════════════════════════════════════════
-      // STEP 1: SNAPSHOT TO deleted_bugs (CRITICAL - FAIL IF ERROR)
-      // ═══════════════════════════════════════════════════════════════
-      const snapshotData = {
-        original_bug_id: bug.id,
-        user_id: bug.user_id,
-        title: bug.title,
-        description: bug.description,
-        status: bug.status,
-        priority: bug.priority,
-        reported_by_email: bug.reported_by_email || actorEmail,
-        reported_by_name: bug.reported_by_name || null,
-        deleted_by: actorId,
-        deleted_at: new Date().toISOString(),
-        original_created_at: bug.created_at,
-        metadata: {
-          is_archived: bug.is_archived,
-          category: bug.category,
-          environment: bug.environment,
-        }
-      }
-
-      const { error: snapshotError } = await supabase
-        .from('deleted_bugs')
-        .insert(snapshotData)
-
-      if (snapshotError) {
-        console.error('❌ STEP 1 FAILED: Snapshot to deleted_bugs failed:', snapshotError)
-        throw new Error(`Snapshot failed: ${snapshotError.message}`)
-      }
-      console.log('✅ STEP 1: Bug snapshotted to deleted_bugs')
-
-      // ═══════════════════════════════════════════════════════════════
-      // STEP 2: LOG ACTIVITY (CRITICAL - MUST BE BEFORE DELETION)
-      // Uses centralized logger with entity_id enforcement
-      // ═══════════════════════════════════════════════════════════════
-      const logResult = await logBugActivity({
-        action: 'bug_deleted',
-        bugId: bug.id,  // REQUIRED: entity_id - NEVER null
-        actorId: actorId,
-        actorEmail: actorEmail,
-        field: 'deleted',
-        oldValue: bug.title,  // Store title for audit
-        newValue: isAdmin ? 'admin_delete' : 'owner_delete',
-      })
-
-      if (!logResult.success) {
-        console.error('❌ STEP 2 FAILED: Activity log failed:', logResult.error)
-        throw new Error(`Activity log failed: ${logResult.error}`)
-      }
-      console.log('✅ STEP 2: Activity logged')
-
-      // ═══════════════════════════════════════════════════════════════
-      // STEP 3: HARD DELETE FROM bugs (CRITICAL - FAIL IF ERROR)
-      // ═══════════════════════════════════════════════════════════════
+      // Hard delete from bugs (RLS enforced, DB triggers handle logging)
       const { error: deleteError } = await supabase
         .from('bugs')
         .delete()
         .eq('id', bug.id)
 
       if (deleteError) {
-        console.error('❌ STEP 3 FAILED: Hard delete failed:', deleteError)
+        console.error('Delete failed:', deleteError)
         throw new Error(`Delete failed: ${deleteError.message}`)
       }
-      console.log('✅ STEP 3: Bug deleted from bugs table')
 
-      // ═══════════════════════════════════════════════════════════════
-      // STEP 4: CLEANUP IMAGES (BEST-EFFORT - DON'T FAIL)
-      // ═══════════════════════════════════════════════════════════════
-      const cleanupResult = await deleteBugImages(bug.user_id, bug.id)
+      // Cleanup images (best-effort)
+      const cleanupResult = await deleteBugImages(bug.reported_by, bug.id)
       if (!cleanupResult.success) {
-        console.warn('⚠️ STEP 4: Image cleanup failed (non-fatal):', cleanupResult.error)
-      } else {
-        console.log('✅ STEP 4: Images cleaned up')
+        console.warn('Image cleanup failed (non-fatal):', cleanupResult.error)
       }
 
-      // Keep bug.id in deletingBugIdsRef on success (it's permanently deleted)
-      // This prevents any stale UI from attempting to re-delete
       return { success: true, deletedBugId: bug.id }
     } catch (err) {
-      console.error('❌ Delete flow aborted:', err.message)
+      console.error('Delete flow aborted:', err.message)
       setError(err.message)
-      // On failure, allow retry by removing from the set
       deletingBugIdsRef.current.delete(bug.id)
       return { success: false, error: err.message }
     } finally {

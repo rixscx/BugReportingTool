@@ -1,14 +1,15 @@
 import { Link } from 'react-router-dom'
 
+// Canonical action config from activity_logs.action enum
 const actionConfig = {
     bug_created: { label: 'Created', color: '#22c55e' },
+    bug_updated: { label: 'Updated', color: '#6366f1' },
     bug_status_changed: { label: 'Status', color: '#6366f1' },
-    bug_archived: { label: 'Archived', color: '#eab308' },
-    bug_restored: { label: 'Restored', color: '#6366f1' },
-    deleted: { label: 'Deleted', color: '#ef4444' },
-    comment_created: { label: 'Comment', color: '#8b5cf6' },
-    comment_updated: { label: 'Edited', color: '#4a4a58' },
+    bug_assigned: { label: 'Assigned', color: '#8b5cf6' },
+    comment_added: { label: 'Comment', color: '#8b5cf6' },
+    comment_edited: { label: 'Edited', color: '#4a4a58' },
     comment_deleted: { label: 'Removed', color: '#ef4444' },
+    profile_updated: { label: 'Profile', color: '#4a4a58' },
 }
 
 export default function LogsTable({ activities }) {
@@ -42,8 +43,8 @@ export default function LogsTable({ activities }) {
                         {activities.map((log, idx) => {
                             const config = actionConfig[log.action] || { label: log.action, color: '#4a4a58' }
                             return (
-                                <tr 
-                                    key={log.id} 
+                                <tr
+                                    key={log.id}
                                     className={`hover:bg-[rgba(99,102,241,0.04)] transition-colors ${idx !== activities.length - 1 ? 'border-b border-[rgba(255,255,255,0.04)]' : ''}`}
                                 >
                                     <td className="px-5 py-4">
@@ -53,13 +54,13 @@ export default function LogsTable({ activities }) {
                                     <td className="px-5 py-4">
                                         <div className="flex items-center gap-2.5">
                                             <div className="w-7 h-7 rounded-lg bg-gradient-to-br from-[#6366f1]/20 to-[#8b5cf6]/20 flex items-center justify-center text-[10px] font-semibold text-[#818cf8]">
-                                                {(log.user?.username || log.actor_email?.split('@')[0] || 'S')[0].toUpperCase()}
+                                                {(log.actor?.username || log.actor?.email?.split('@')[0] || 'S')[0].toUpperCase()}
                                             </div>
-                                            <span className="text-[12px] text-[#f0f0f5] font-medium">{log.user?.username || log.actor_email?.split('@')[0] || 'System'}</span>
+                                            <span className="text-[12px] text-[#f0f0f5] font-medium">{log.actor?.username || log.actor?.email?.split('@')[0] || 'System'}</span>
                                         </div>
                                     </td>
                                     <td className="px-5 py-4">
-                                        <span 
+                                        <span
                                             className="inline-flex items-center gap-1.5 px-2.5 py-1 rounded-lg text-[11px] font-medium"
                                             style={{ backgroundColor: `${config.color}15`, color: config.color }}
                                         >
@@ -68,21 +69,25 @@ export default function LogsTable({ activities }) {
                                         </span>
                                     </td>
                                     <td className="px-5 py-4">
-                                        <Link 
-                                            to={`/bug/${log.bug_id}`} 
-                                            className="text-[11px] font-mono px-2 py-1 bg-[rgba(99,102,241,0.1)] text-[#818cf8] rounded-lg hover:bg-[rgba(99,102,241,0.2)] transition-colors"
-                                        >
-                                            #{log.bug_id?.slice(0, 6)}
-                                        </Link>
+                                        {log.entity_type === 'bug' && log.entity_id ? (
+                                            <Link
+                                                to={`/bug/${log.entity_id}`}
+                                                className="text-[11px] font-mono px-2 py-1 bg-[rgba(99,102,241,0.1)] text-[#818cf8] rounded-lg hover:bg-[rgba(99,102,241,0.2)] transition-colors"
+                                            >
+                                                #{log.entity_id?.slice(0, 6)}
+                                            </Link>
+                                        ) : (
+                                            <span className="text-[11px] text-[#35354a]">—</span>
+                                        )}
                                     </td>
                                     <td className="px-5 py-4">
-                                        {log.metadata?.old_status && log.metadata?.new_status ? (
+                                        {log.action === 'bug_status_changed' && log.metadata?.from && log.metadata?.to ? (
                                             <div className="flex items-center gap-2 text-[11px]">
-                                                <span className="px-2 py-1 bg-[rgba(255,255,255,0.03)] rounded-lg text-[#4a4a58] line-through">{log.metadata.old_status}</span>
+                                                <span className="px-2 py-1 bg-[rgba(255,255,255,0.03)] rounded-lg text-[#4a4a58] line-through">{log.metadata.from}</span>
                                                 <svg className="w-3.5 h-3.5 text-[#4a4a58]" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                                                     <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M13 7l5 5m0 0l-5 5m5-5H6" />
                                                 </svg>
-                                                <span className="px-2 py-1 bg-[rgba(99,102,241,0.1)] rounded-lg text-[#9898a8]">{log.metadata.new_status}</span>
+                                                <span className="px-2 py-1 bg-[rgba(99,102,241,0.1)] rounded-lg text-[#9898a8]">{log.metadata.to}</span>
                                             </div>
                                         ) : (
                                             <span className="text-[11px] text-[#35354a]">—</span>

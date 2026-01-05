@@ -6,6 +6,7 @@ import { useAuth } from '../hooks/useAuth'
 import { useToast } from './Toast'
 import { ConfirmDialog, useConfirmDialog } from './ConfirmDialog'
 import { KeyboardShortcutsHelp } from './KeyboardShortcutsHelp'
+import { NotificationCenter } from './NotificationCenter'
 
 export default function Navbar({ session, userProfile, isAdmin }) {
   const location = useLocation()
@@ -89,11 +90,10 @@ export default function Navbar({ session, userProfile, isAdmin }) {
   const NavLink = ({ to, children }) => (
     <Link
       to={to}
-      className={`relative px-4 py-2 text-[13px] font-medium rounded-xl transition-all duration-200 ${
-        isActive(to)
+      className={`relative px-4 py-2 text-[13px] font-medium rounded-xl transition-all duration-200 ${isActive(to)
           ? 'text-[#f0f0f5] bg-[rgba(255,255,255,0.06)]'
           : 'text-[#6b6b7b] hover:text-[#9898a8] hover:bg-[rgba(255,255,255,0.03)]'
-      }`}
+        }`}
     >
       {children}
       {isActive(to) && (
@@ -107,18 +107,18 @@ export default function Navbar({ session, userProfile, isAdmin }) {
       <header className="sticky top-0 z-40 border-b border-[rgba(255,255,255,0.05)]">
         {/* Glassmorphism background */}
         <div className="absolute inset-0 bg-[#06060a]/70 backdrop-blur-2xl" />
-        
+
         {/* Ambient gradient */}
         <div className="absolute inset-0 bg-gradient-to-r from-[rgba(99,102,241,0.03)] via-transparent to-[rgba(139,92,246,0.03)] pointer-events-none" />
-        
+
         <div className="relative w-full px-4 sm:px-6 lg:px-10">
           <div className="flex items-center justify-between h-16">
             {/* Left: Logo + Nav - pushed to left edge */}
             <div className="flex items-center gap-8">
               <Link to="/" className="flex items-center gap-2.5 group">
-                <img 
-                  src="/logo-buggy.svg" 
-                  alt="Cpt Buggy" 
+                <img
+                  src="/logo-buggy.svg"
+                  alt="Cpt Buggy"
                   className="w-10 h-10 group-hover:scale-105 transition-transform duration-300"
                 />
                 <span className="text-[16px] font-semibold text-[#f0f0f5] hidden sm:block tracking-[-0.02em]">Cpt Buggy</span>
@@ -143,6 +143,11 @@ export default function Navbar({ session, userProfile, isAdmin }) {
                 <span>Search</span>
                 <kbd className="text-[10px] px-2 py-1 bg-[rgba(255,255,255,0.05)] rounded-lg text-[#4a4a58] font-medium">⌘K</kbd>
               </button>
+
+              {/* Notification Bell */}
+              {session?.user?.id && (
+                <NotificationCenter userId={session.user.id} />
+              )}
 
               {isAdmin && (
                 <span className="hidden sm:inline-flex px-3 py-1 text-[10px] font-semibold text-[#6366f1] bg-[rgba(99,102,241,0.12)] border border-[rgba(99,102,241,0.2)] rounded-full">
@@ -174,7 +179,7 @@ export default function Navbar({ session, userProfile, isAdmin }) {
                   <div className="absolute right-0 mt-3 w-60 bg-[#0a0a0f]/95 backdrop-blur-2xl border border-[rgba(255,255,255,0.08)] rounded-2xl shadow-[0_16px_48px_rgba(0,0,0,0.5)] py-2 animate-slide-up-spring overflow-hidden">
                     {/* Gradient accent */}
                     <div className="absolute top-0 left-0 right-0 h-px bg-gradient-to-r from-transparent via-[rgba(99,102,241,0.4)] to-transparent" />
-                    
+
                     <div className="px-4 py-3 border-b border-[rgba(255,255,255,0.06)]">
                       <p className="text-[13px] font-semibold text-[#f0f0f5] truncate">{userProfile?.username || 'User'}</p>
                       <p className="text-[11px] text-[#6b6b7b] truncate mt-0.5">{session?.user?.email}</p>

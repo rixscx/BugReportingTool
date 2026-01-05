@@ -57,3 +57,5 @@ deploy-docker.sh
 *.tmp
 *.temp
 ~*
+*.zip
+bugreport-*/

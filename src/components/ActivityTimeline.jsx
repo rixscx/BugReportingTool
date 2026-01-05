@@ -1,14 +1,16 @@
 import { useState, useEffect, useCallback } from 'react'
 import { supabase } from '../lib/supabaseClient'
 
+// Canonical action labels from activity_logs.action enum
 const actionLabels = {
-  bug_created: 'created',
+  bug_created: 'created this bug',
+  bug_updated: 'updated this bug',
   bug_status_changed: 'changed status',
-  bug_archived: 'archived',
-  bug_restored: 'restored',
-  comment_created: 'commented',
-  comment_updated: 'edited comment',
-  comment_deleted: 'deleted comment',
+  bug_assigned: 'assigned this bug',
+  comment_added: 'added a comment',
+  comment_edited: 'edited a comment',
+  comment_deleted: 'deleted a comment',
+  profile_updated: 'updated profile',
 }
 
 export default function ActivityTimeline({ bugId }) {
@@ -17,10 +19,11 @@ export default function ActivityTimeline({ bugId }) {
 
   const fetchActivities = useCallback(async () => {
     try {
+      // Query activity_logs filtered by entity_id (bug UUID)
       const { data, error: fetchError } = await supabase
-        .from('bug_activity')
-        .select(`*`)
-        .eq('bug_id', bugId)
+        .from('activity_logs')
+        .select('*')
+        .eq('entity_id', bugId)
         .order('created_at', { ascending: false })
 
       if (fetchError) throw fetchError
@@ -28,13 +31,16 @@ export default function ActivityTimeline({ bugId }) {
       const actorIds = [...new Set((data || []).map(a => a.actor_id).filter(Boolean))]
       let profilesMap = {}
       if (actorIds.length > 0) {
-        const { data: profiles } = await supabase.from('profiles').select('id, username, email').in('id', actorIds)
+        const { data: profiles } = await supabase
+          .from('profiles')
+          .select('id, username, email')
+          .in('id', actorIds)
         profilesMap = (profiles || []).reduce((acc, p) => { acc[p.id] = p; return acc }, {})
       }
 
       const enriched = (data || []).map(activity => ({
         ...activity,
-        user: profilesMap[activity.actor_id] || { email: activity.actor_email || 'Unknown', username: activity.actor_email?.split('@')[0] || 'Unknown' }
+        actor: profilesMap[activity.actor_id] || { email: 'Unknown', username: 'Unknown' }
       }))
 
       setActivities(enriched)
@@ -47,8 +53,9 @@ export default function ActivityTimeline({ bugId }) {
 
   useEffect(() => {
     fetchActivities()
-    const channel = supabase.channel(`bug-activity-${bugId}`)
-      .on('postgres_changes', { event: 'INSERT', schema: 'public', table: 'bug_activity', filter: `bug_id=eq.${bugId}` }, async () => { await fetchActivities() })
+    // Realtime subscription on activity_logs for this bug
+    const channel = supabase.channel(`activity-logs-${bugId}`)
+      .on('postgres_changes', { event: 'INSERT', schema: 'public', table: 'activity_logs', filter: `entity_id=eq.${bugId}` }, async () => { await fetchActivities() })
       .subscribe()
     return () => { supabase.removeChannel(channel) }
   }, [bugId, fetchActivities])
@@ -68,9 +75,18 @@ export default function ActivityTimeline({ bugId }) {
       ) : (
         <div className="space-y-3">
           {activities.map((activity, index) => {
-            const userName = activity.user?.username || activity.actor_email?.split('@')[0] || 'User'
-            const label = actionLabels[activity.action] || activity.action.replace(/_/g, ' ')
-            
+            const userName = activity.actor?.username || activity.actor?.email?.split('@')[0] || 'User'
+            const label = actionLabels[activity.action] || activity.action?.replace(/_/g, ' ') || 'performed action'
+
+            // Render metadata based on action type (never infer from raw values)
+            let metaDetail = null
+            if (activity.action === 'bug_status_changed' && activity.metadata) {
+              const { from, to } = activity.metadata
+              if (from && to) {
+                metaDetail = <span className="text-[#4a4a58]"> · {from} → {to}</span>
+              }
+            }
+
             return (
               <div key={activity.id} className="flex items-start gap-3 py-2">
                 <div className="relative flex flex-col items-center">
@@ -82,9 +98,7 @@ export default function ActivityTimeline({ bugId }) {
                 <div className="flex-1 min-w-0 -mt-0.5">
                   <p className="text-[12px] text-[#9898a8]">
                     <span className="text-[#f0f0f5] font-medium">{userName}</span> {label}
-                    {activity.metadata?.old_status && activity.metadata?.new_status && (
-                      <span className="text-[#4a4a58]"> · {activity.metadata.old_status} → {activity.metadata.new_status}</span>
-                    )}
+                    {metaDetail}
                   </p>
                   <p className="text-[10px] text-[#4a4a58] mt-1">
                     {new Date(activity.created_at).toLocaleDateString()} {new Date(activity.created_at).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}

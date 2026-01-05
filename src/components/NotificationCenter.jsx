@@ -12,25 +12,27 @@ export function useNotifications(userId) {
 
   const fetchNotifications = useCallback(async () => {
     if (!userId) return
+    // Use recipient_id and is_read per new schema
     const { data, error } = await supabase
       .from('notifications')
       .select('*')
-      .eq('user_id', userId)
+      .eq('recipient_id', userId)
       .order('created_at', { ascending: false })
       .limit(20)
 
     if (!error && data) {
       setNotifications(data)
-      setUnreadCount(data.filter(n => !n.read).length)
+      setUnreadCount(data.filter(n => !n.is_read).length)
     }
     setLoading(false)
   }, [userId])
 
   useEffect(() => {
     fetchNotifications()
+    // Realtime subscription on notifications for this user
     const channel = supabase
-      .channel('notifications')
-      .on('postgres_changes', { event: 'INSERT', schema: 'public', table: 'notifications', filter: `user_id=eq.${userId}` }, (payload) => {
+      .channel(`notifications-${userId}`)
+      .on('postgres_changes', { event: 'INSERT', schema: 'public', table: 'notifications', filter: `recipient_id=eq.${userId}` }, (payload) => {
         setNotifications(prev => [payload.new, ...prev])
         setUnreadCount(prev => prev + 1)
       })
@@ -39,24 +41,23 @@ export function useNotifications(userId) {
   }, [userId, fetchNotifications])
 
   const markAsRead = async (notificationId) => {
-    await supabase.from('notifications').update({ read: true }).eq('id', notificationId)
-    setNotifications(prev => prev.map(n => n.id === notificationId ? { ...n, read: true } : n))
+    await supabase.from('notifications').update({ is_read: true }).eq('id', notificationId)
+    setNotifications(prev => prev.map(n => n.id === notificationId ? { ...n, is_read: true } : n))
     setUnreadCount(prev => Math.max(0, prev - 1))
   }
 
   const markAllAsRead = async () => {
-    await supabase.from('notifications').update({ read: true }).eq('user_id', userId).eq('read', false)
-    setNotifications(prev => prev.map(n => ({ ...n, read: true })))
+    await supabase.from('notifications').update({ is_read: true }).eq('recipient_id', userId).eq('is_read', false)
+    setNotifications(prev => prev.map(n => ({ ...n, is_read: true })))
     setUnreadCount(0)
   }
 
   return { notifications, unreadCount, loading, markAsRead, markAllAsRead, refetch: fetchNotifications }
 }
 
-export async function createNotification({ userId, type, title, message, bugId }) {
-  if (!userId) return
-  await supabase.from('notifications').insert({ user_id: userId, type, title, message, bug_id: bugId, read: false })
-}
+// NOTE: createNotification removed - DB triggers handle notification creation
+
+
 
 export function NotificationCenter({ userId }) {
   const { notifications, unreadCount, markAsRead, markAllAsRead } = useNotifications(userId)
@@ -84,7 +85,7 @@ export function NotificationCenter({ userId }) {
           <div className="absolute right-0 mt-2 w-80 bg-[rgba(12,12,18,0.95)] backdrop-blur-2xl rounded-2xl border border-[rgba(255,255,255,0.08)] z-50 overflow-hidden shadow-[0_16px_48px_rgba(0,0,0,0.4)]">
             {/* Top gradient accent */}
             <div className="absolute top-0 left-0 right-0 h-px bg-gradient-to-r from-transparent via-[#6366f1]/40 to-transparent" />
-            
+
             <div className="px-4 py-3 border-b border-[rgba(255,255,255,0.06)] flex items-center justify-between">
               <h3 className="text-[13px] font-semibold text-[#f0f0f5]">Notifications</h3>
               {unreadCount > 0 && (
@@ -105,23 +106,33 @@ export function NotificationCenter({ userId }) {
                   <p className="text-[12px] text-[#4a4a58]">No notifications yet</p>
                 </div>
               ) : (
-                notifications.map(notification => (
-                  <Link
-                    key={notification.id}
-                    to={notification.bug_id ? `/bug/${notification.bug_id}` : '#'}
-                    onClick={() => { markAsRead(notification.id); setIsOpen(false) }}
-                    className={`flex gap-3 px-4 py-3 hover:bg-[rgba(99,102,241,0.05)] transition-all duration-200 ${!notification.read ? 'bg-[rgba(99,102,241,0.08)]' : ''}`}
-                  >
-                    <div className={`w-2 h-2 rounded-full mt-1.5 flex-shrink-0 ${!notification.read ? 'bg-[#6366f1] shadow-[0_0_6px_rgba(99,102,241,0.5)]' : 'bg-[#35354a]'}`} />
-                    <div className="flex-1 min-w-0">
-                      <p className={`text-[12px] truncate ${!notification.read ? 'text-[#f0f0f5] font-medium' : 'text-[#9898a8]'}`}>
-                        {notification.title}
-                      </p>
-                      <p className="text-[11px] text-[#4a4a58] truncate mt-0.5">{notification.message}</p>
-                      <p className="text-[10px] text-[#35354a] mt-1">{formatSmartDate(notification.created_at)}</p>
-                    </div>
-                  </Link>
-                ))
+                notifications.map(notification => {
+                  // Link to bug if entity_type is 'bug'
+                  const linkTo = notification.entity_type === 'bug' && notification.entity_id
+                    ? `/bug/${notification.entity_id}`
+                    : '#'
+                  // Generate title from notification_type and metadata
+                  const title = notification.metadata?.title || notification.notification_type?.replace(/_/g, ' ') || 'Notification'
+                  const message = notification.metadata?.message || ''
+
+                  return (
+                    <Link
+                      key={notification.id}
+                      to={linkTo}
+                      onClick={() => { markAsRead(notification.id); setIsOpen(false) }}
+                      className={`flex gap-3 px-4 py-3 hover:bg-[rgba(99,102,241,0.05)] transition-all duration-200 ${!notification.is_read ? 'bg-[rgba(99,102,241,0.08)]' : ''}`}
+                    >
+                      <div className={`w-2 h-2 rounded-full mt-1.5 flex-shrink-0 ${!notification.is_read ? 'bg-[#6366f1] shadow-[0_0_6px_rgba(99,102,241,0.5)]' : 'bg-[#35354a]'}`} />
+                      <div className="flex-1 min-w-0">
+                        <p className={`text-[12px] truncate ${!notification.is_read ? 'text-[#f0f0f5] font-medium' : 'text-[#9898a8]'}`}>
+                          {title}
+                        </p>
+                        {message && <p className="text-[11px] text-[#4a4a58] truncate mt-0.5">{message}</p>}
+                        <p className="text-[10px] text-[#35354a] mt-1">{formatSmartDate(notification.created_at)}</p>
+                      </div>
+                    </Link>
+                  )
+                })
               )}
             </div>
           </div>
