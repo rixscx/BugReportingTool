@@ -110,10 +110,10 @@ export default function BugCard({ bug }) {
 
           <div className="flex items-center gap-2.5 mt-3 text-[10px] text-[#4a4a58]">
             <span>{formatSmartDate(bug.created_at)}</span>
-            {bug.reported_by_name && (
+            {bug.reporter?.username && (
               <>
                 <span className="w-1 h-1 rounded-full bg-[#35354a]" />
-                <span className="truncate max-w-[120px]">{bug.reported_by_name}</span>
+                <span className="truncate max-w-[120px]">{bug.reporter.username}</span>
               </>
             )}
           </div>

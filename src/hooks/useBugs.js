@@ -20,8 +20,9 @@ export function useBugs(options = {}) {
 
       let query = supabase
         .from('bugs')
-        .select(`*`)
+        .select(`*, reporter:profiles!reported_by(id, username, email)`)
         .order('created_at', { ascending: false })
+
 
       if (!includeArchived) {
         query = query.eq('is_archived', false)

@@ -109,11 +109,10 @@ export default function Issue({ session }) {
           status: 'Open',
           is_archived: false,
           reported_by: session.user.id,
-          reported_by_email: session.user.email,
-          reported_by_name: userProfile?.full_name || userProfile?.username || null,
         })
         .select('id, reported_by')
         .single()
+
 
       if (insertError) throw new Error(insertError.message)
       createdBugId = inserted?.id
@@ -229,8 +228,8 @@ export default function Issue({ session }) {
                     type="button"
                     onClick={() => setFormData({ ...formData, priority: p.value })}
                     className={`flex items-center gap-2 px-3 py-2 rounded-lg text-xs font-medium transition-all ${formData.priority === p.value
-                        ? 'bg-[rgba(255,255,255,0.08)] text-[#f0f0f5]'
-                        : 'text-[#6b6b7b] hover:text-[#9898a8] hover:bg-[rgba(255,255,255,0.03)]'
+                      ? 'bg-[rgba(255,255,255,0.08)] text-[#f0f0f5]'
+                      : 'text-[#6b6b7b] hover:text-[#9898a8] hover:bg-[rgba(255,255,255,0.03)]'
                       }`}
                   >
                     <span
@@ -347,10 +346,10 @@ export default function Issue({ session }) {
             onDragLeave={handleDragLeave}
             onDrop={handleDrop}
             className={`relative rounded-xl p-4 transition-all ${isDragging
-                ? 'border-2 border-dashed border-[rgba(99,102,241,0.4)] bg-[rgba(99,102,241,0.05)]'
-                : imageFile
-                  ? 'border border-[rgba(34,197,94,0.2)] bg-[rgba(34,197,94,0.03)]'
-                  : 'border border-dashed border-[rgba(255,255,255,0.08)] hover:border-[rgba(255,255,255,0.12)]'
+              ? 'border-2 border-dashed border-[rgba(99,102,241,0.4)] bg-[rgba(99,102,241,0.05)]'
+              : imageFile
+                ? 'border border-[rgba(34,197,94,0.2)] bg-[rgba(34,197,94,0.03)]'
+                : 'border border-dashed border-[rgba(255,255,255,0.08)] hover:border-[rgba(255,255,255,0.12)]'
               }`}
           >
             {imageFile ? (

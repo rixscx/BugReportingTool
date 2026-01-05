@@ -20,7 +20,7 @@ export function exportToCSV(bugs, filename = 'bugs-export') {
       let value = ''
       switch (col.key) {
         case 'reporter':
-          value = bug.reported_by_name || bug.reported_by_email || ''
+          value = bug.reporter?.username || bug.reporter?.email || ''
           break
         case 'created_at':
         case 'updated_at':
@@ -64,7 +64,7 @@ export function exportToJSON(bugs, filename = 'bugs-export') {
     status: bug.status,
     priority: bug.priority,
     steps_to_reproduce: bug.steps_to_reproduce || null,
-    reporter: bug.reported_by_name || bug.reported_by_email || null,
+    reporter: bug.reporter?.username || bug.reporter?.email || null,
     created_at: bug.created_at,
     updated_at: bug.updated_at,
     is_archived: bug.is_archived,

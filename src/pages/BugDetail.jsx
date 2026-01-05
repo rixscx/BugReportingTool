@@ -35,7 +35,12 @@ export default function BugDetail({ session, isAdmin }) {
 
   const fetchBug = useCallback(async () => {
     try {
-      const { data, error: fetchError } = await supabase.from('bugs').select('*').eq('id', id).single()
+      // Join with profiles to get reporter info
+      const { data, error: fetchError } = await supabase
+        .from('bugs')
+        .select('*, reporter:profiles!reported_by(id, username, email)')
+        .eq('id', id)
+        .single()
       if (fetchError) throw fetchError
       // Use reported_by for image storage (new schema)
       const images = await listBugImages(data.reported_by, data.id)
@@ -225,7 +230,7 @@ export default function BugDetail({ session, isAdmin }) {
             <span className="text-[#35354a]">·</span>
             <span className="text-[#4a4a58]">{formatSmartDate(bug.created_at)}</span>
             <span className="text-[#35354a]">·</span>
-            <span className="text-[#4a4a58]">{bug.reported_by_name || bug.reported_by_email?.split('@')[0]}</span>
+            <span className="text-[#4a4a58]">{bug.reporter?.username || bug.reporter?.email?.split('@')[0]}</span>
           </div>
         </div>
 
@@ -308,10 +313,10 @@ export default function BugDetail({ session, isAdmin }) {
                 <label className="block text-xs font-medium text-[#9898a8] mb-4 tracking-wide uppercase">Reporter</label>
                 <div className="flex items-center gap-4">
                   <div className="w-11 h-11 rounded-2xl bg-gradient-to-br from-[rgba(99,102,241,0.3)] to-[rgba(139,92,246,0.2)] border border-[rgba(255,255,255,0.1)] flex items-center justify-center text-[#a5b4fc] text-base font-semibold shadow-[0_4px_20px_rgba(99,102,241,0.15)]">
-                    {(bug.reported_by_name || bug.reported_by_email || 'U')[0].toUpperCase()}
+                    {(bug.reporter?.username || bug.reporter?.email || 'U')[0].toUpperCase()}
                   </div>
                   <div>
-                    <p className="text-sm text-[#f0f0f5] font-medium">{bug.reported_by_name || bug.reported_by_email?.split('@')[0]}</p>
+                    <p className="text-sm text-[#f0f0f5] font-medium">{bug.reporter?.username || bug.reporter?.email?.split('@')[0]}</p>
                     <p className="text-[11px] text-[#6b6b7b] mt-0.5">{formatSmartDate(bug.created_at)}</p>
                   </div>
                 </div>

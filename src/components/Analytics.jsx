@@ -26,13 +26,13 @@ export default function Analytics({ bugs }) {
     const resolvedBugs = bugs.filter(b => b.status === 'Resolved')
     const avgResolutionDays = resolvedBugs.length > 0
       ? Math.round(resolvedBugs.reduce((acc, bug) => {
-          const created = new Date(bug.created_at)
-          const updated = new Date(bug.updated_at)
-          return acc + (updated - created) / (1000 * 60 * 60 * 24)
-        }, 0) / resolvedBugs.length)
+        const created = new Date(bug.created_at)
+        const updated = new Date(bug.updated_at)
+        return acc + (updated - created) / (1000 * 60 * 60 * 24)
+      }, 0) / resolvedBugs.length)
       : 0
     const reporterCounts = bugs.reduce((acc, bug) => {
-      const name = bug.reported_by_name || (bug.reported_by_email ? bug.reported_by_email.split('@')[0] : 'Unknown')
+      const name = bug.reporter?.username || (bug.reporter?.email ? bug.reporter.email.split('@')[0] : 'Unknown')
       acc[name] = (acc[name] || 0) + 1
       return acc
     }, {})
@@ -85,7 +85,7 @@ export default function Analytics({ bugs }) {
           <div className="h-28 flex items-end gap-px">
             {stats.bugsOverTime.map((day, i) => (
               <div key={i} className="flex-1 flex flex-col items-center">
-                <div 
+                <div
                   className="w-full bg-gradient-to-t from-[#6366f1] to-[#8b5cf6] rounded-sm transition-all hover:from-[#818cf8] hover:to-[#a78bfa] hover:shadow-[0_0_8px_rgba(99,102,241,0.4)]"
                   style={{ height: `${(day.count / maxDailyBugs) * 100}%`, minHeight: day.count > 0 ? '2px' : '0' }}
                   title={`${day.date}: ${day.count}`}
