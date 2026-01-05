@@ -58,4 +58,5 @@ deploy-docker.sh
 *.temp
 ~*
 *.zip
-bugreport-*/
+bugreport*/
+db_screenshots/

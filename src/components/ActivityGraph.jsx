@@ -7,15 +7,16 @@ export default function ActivityGraph({ activities }) {
         const userMap = new Map()
 
         activities.forEach(act => {
-            const userId = act.user_id || act.actor_id
+            // activity_logs uses actor_id and actor object for profile
+            const userId = act.actor_id
             if (!userId) return
-            const userName = act.user?.username || act.actor_email || userId.slice(0, 8)
+            const userName = act.actor?.username || act.actor?.email?.split('@')[0] || userId.slice(0, 8)
 
             if (!userMap.has(userId)) {
                 userMap.set(userId, { id: userId, name: userName, activities: [] })
             }
             userMap.get(userId).activities.push({
-                id: act.id, action: act.action, bugId: act.bug_id, timestamp: act.created_at
+                id: act.id, action: act.action, bugId: act.entity_id, timestamp: act.created_at
             })
         })
 
@@ -39,7 +40,7 @@ export default function ActivityGraph({ activities }) {
                 <div key={user.id} className="group relative bg-[rgba(12,12,18,0.7)] backdrop-blur-xl rounded-2xl border border-[rgba(255,255,255,0.06)] overflow-hidden hover:border-[rgba(99,102,241,0.3)] transition-all duration-300 hover:-translate-y-0.5">
                     {/* Top gradient accent */}
                     <div className="absolute top-0 left-0 right-0 h-px bg-gradient-to-r from-transparent via-[#6366f1]/30 to-transparent opacity-0 group-hover:opacity-100 transition-opacity" />
-                    
+
                     <div className="border-b border-[rgba(255,255,255,0.06)] px-4 py-3 flex items-center gap-3">
                         <div className="w-8 h-8 rounded-xl bg-gradient-to-br from-[rgba(99,102,241,0.2)] to-[rgba(139,92,246,0.2)] border border-[rgba(255,255,255,0.08)] flex items-center justify-center text-[11px] text-[#818cf8] font-semibold shadow-[0_4px_12px_rgba(99,102,241,0.1)]">
                             {user.name[0]?.toUpperCase() || '?'}

@@ -88,7 +88,7 @@ export default function Issue({ session }) {
 
     try {
       if (!userProfile) { setError('Profile not ready'); setLoading(false); setSubmitting(false); return }
-      
+
       let fullDescription = formData.description
       if (formData.steps_to_reproduce?.trim()) fullDescription += `\n\n---\n\n**Steps to Reproduce:**\n\n${formData.steps_to_reproduce.trim()}`
       if (formData.expected_behavior || formData.actual_behavior) {
@@ -108,11 +108,11 @@ export default function Issue({ session }) {
           priority: formData.priority,
           status: 'Open',
           is_archived: false,
-          user_id: session.user.id,
+          reported_by: session.user.id,
           reported_by_email: session.user.email,
           reported_by_name: userProfile?.full_name || userProfile?.username || null,
         })
-        .select('id, user_id')
+        .select('id, reported_by')
         .single()
 
       if (insertError) throw new Error(insertError.message)
@@ -228,15 +228,14 @@ export default function Issue({ session }) {
                     key={p.value}
                     type="button"
                     onClick={() => setFormData({ ...formData, priority: p.value })}
-                    className={`flex items-center gap-2 px-3 py-2 rounded-lg text-xs font-medium transition-all ${
-                      formData.priority === p.value
+                    className={`flex items-center gap-2 px-3 py-2 rounded-lg text-xs font-medium transition-all ${formData.priority === p.value
                         ? 'bg-[rgba(255,255,255,0.08)] text-[#f0f0f5]'
                         : 'text-[#6b6b7b] hover:text-[#9898a8] hover:bg-[rgba(255,255,255,0.03)]'
-                    }`}
+                      }`}
                   >
-                    <span 
+                    <span
                       className="w-2 h-2 rounded-full"
-                      style={{ 
+                      style={{
                         backgroundColor: p.color,
                         boxShadow: formData.priority === p.value ? `0 0 8px ${p.color}` : 'none'
                       }}
@@ -269,7 +268,7 @@ export default function Issue({ session }) {
               </svg>
               Additional details
             </summary>
-            
+
             <div className="mt-6 space-y-6 pl-6 border-l border-[rgba(255,255,255,0.05)]">
               {/* Steps to reproduce */}
               <div>
@@ -347,13 +346,12 @@ export default function Issue({ session }) {
             onDragOver={handleDragOver}
             onDragLeave={handleDragLeave}
             onDrop={handleDrop}
-            className={`relative rounded-xl p-4 transition-all ${
-              isDragging 
-                ? 'border-2 border-dashed border-[rgba(99,102,241,0.4)] bg-[rgba(99,102,241,0.05)]' 
-                : imageFile 
+            className={`relative rounded-xl p-4 transition-all ${isDragging
+                ? 'border-2 border-dashed border-[rgba(99,102,241,0.4)] bg-[rgba(99,102,241,0.05)]'
+                : imageFile
                   ? 'border border-[rgba(34,197,94,0.2)] bg-[rgba(34,197,94,0.03)]'
                   : 'border border-dashed border-[rgba(255,255,255,0.08)] hover:border-[rgba(255,255,255,0.12)]'
-            }`}
+              }`}
           >
             {imageFile ? (
               <div className="flex items-center gap-3">
@@ -362,8 +360,8 @@ export default function Issue({ session }) {
                   <p className="text-sm text-[#e0e0e5] truncate">{imageFile.name}</p>
                   <p className="text-[10px] text-[#6b6b7b]">{(imageFile.size / 1024).toFixed(1)} KB</p>
                 </div>
-                <button 
-                  type="button" 
+                <button
+                  type="button"
                   onClick={() => setImageFile(null)}
                   className="p-1 text-[#6b6b7b] hover:text-[#f87171] transition-colors"
                 >
